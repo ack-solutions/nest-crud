@@ -1,0 +1,18 @@
+{
+  "name": "nest-crud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "build:packages": "pnpm -C packages/nest-crud build && pnpm -C packages/nest-crud-request build",
+    "build:example": "pnpm -C apps/example-app build",
+    "build": "pnpm build:packages && pnpm build:example",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "node scripts/publish.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.21.0"
+}
