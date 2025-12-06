@@ -4,7 +4,7 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-<p align="center">A powerful and flexible database seeding library for NestJS applications</p>
+<p align="center">Powerful CRUD operations and query building for NestJS and frontend applications</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@ackplus/nest-crud"><img src="https://img.shields.io/npm/v/@ackplus/nest-crud.svg" alt="NPM Version" /></a>
@@ -12,117 +12,201 @@
   <a href="https://www.npmjs.com/package/@ackplus/nest-crud"><img src="https://img.shields.io/npm/dm/@ackplus/nest-crud.svg" alt="NPM Downloads" /></a>
 </p>
 
-## 📦 About
+## 📦 Packages
 
-`@ackplus/nest-crud` is a CLI-based database seeding solution for NestJS applications. Generate and seed realistic test data with ease using factories, Faker.js, and a simple command-line interface.
+This monorepo contains two complementary packages:
 
-### Key Features
+### [@ackplus/nest-crud](./packages/nest-crud) - Backend CRUD Operations
 
-- 🖥️ **CLI-First** - Simple commands, no app code changes needed
-- 🏭 **Factory Pattern** - Generate realistic data with Faker.js decorators
-- 🔄 **Multiple ORMs** - Works with TypeORM, Mongoose, and Prisma
-- 🎯 **Selective Seeding** - Run specific seeders or all at once
-- 🔥 **Refresh Mode** - Drop and reseed with one command
-- 📦 **Batch Operations** - Efficient bulk data insertion
-- ✅ **Type-Safe** - Full TypeScript support
+Automatic REST API endpoints with advanced filtering, relations, and pagination for NestJS + TypeORM.
 
-## 📦 Installation
+**Key Features:**
+- 🚀 **Automatic CRUD endpoints** - No boilerplate code
+- 🔍 **Advanced filtering** - Complex where conditions with multiple operators
+- 🔗 **Relations handling** - Automatic loading and filtering
+- 📄 **Pagination** - Built-in skip/take support
+- 🎯 **Field selection** - Select specific fields to return
+- 📚 **Swagger integration** - Automatic API documentation
 
-```bash
-npm install @ackplus/nest-crud @faker-js/faker
-npm install -D ts-node typescript
-```
+### [@ackplus/nest-crud-request](./packages/nest-crud-request) - Query Builder
 
-## 🚀 Quick Example
+Framework-agnostic query builder for REST APIs - works in React, Angular, Vue, and any JavaScript/TypeScript environment.
 
-**1. Create a factory:**
+**Key Features:**
+- 🎯 **Framework-agnostic** - Works anywhere
+- 🌐 **Frontend & Backend** - Use in any environment
+- 🔍 **Type-safe** - Full TypeScript support
+- 🔗 **Fluent API** - Chainable methods
+- 📦 **Zero dependencies** - Lightweight
+- 🔄 **Flexible output** - Query string, JSON, or object
 
-```typescript
-// src/factories/user.factory.ts
-import { Factory } from '@ackplus/nest-crud';
+## 🚀 Quick Start
 
-export class UserFactory {
-  @Factory((faker) => faker.person.fullName())
-  name: string;
-
-  @Factory((faker) => faker.internet.email())
-  email: string;
-}
-```
-
-**2. Create a seeder:**
-
-```typescript
-// src/seeders/user.seeder.ts
-import { Injectable } from '@nestjs/common';
-import { Seeder, DataFactory } from '@ackplus/nest-crud';
-
-@Injectable()
-export class UserSeeder implements Seeder {
-  constructor(@InjectRepository(User) private repo: Repository<User>) {}
-
-  async seed(): Promise<void> {
-    const factory = DataFactory.createForClass(UserFactory);
-    const users = factory.generate(10);
-    await this.repo.save(users);
-  }
-
-  async drop(): Promise<void> {
-    await this.repo.delete({});
-  }
-}
-```
-
-**3. Create config file (`seeder.config.ts` in project root):**
-
-```typescript
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './src/entities/user.entity';
-import { UserSeeder } from './src/seeders/user.seeder';
-
-export default {
-  imports: [
-    TypeOrmModule.forRoot({ /* db config */ }),
-    TypeOrmModule.forFeature([User]),
-  ],
-  seeders: [UserSeeder],
-};
-```
-
-**4. Add script and run:**
-
-```json
-{
-  "scripts": {
-    "seed": "nest-seed -c seeder.config.ts"
-  }
-}
-```
+### Backend (NestJS)
 
 ```bash
-npm run seed
+npm install @ackplus/nest-crud
 ```
 
-**Done! 🎉**
+```typescript
+// user.controller.ts
+import { Controller } from '@nestjs/common';
+import { Crud } from '@ackplus/nest-crud';
+import { User } from './user.entity';
+import { UserService } from './user.service';
+
+@Crud({
+  entity: User,
+  routes: {
+    findAll: true,
+    findOne: true,
+    create: true,
+    update: true,
+    delete: true,
+  },
+})
+@Controller('users')
+export class UserController {
+  constructor(public service: UserService) {}
+}
+```
+
+**Result:** Full REST API with filtering, pagination, relations, and more! ✨
+
+```bash
+GET    /users              # List all users
+GET    /users/:id          # Get single user
+POST   /users              # Create user
+PATCH  /users/:id          # Update user
+DELETE /users/:id          # Delete user
+```
+
+[📖 Full Backend Documentation](./packages/nest-crud/README.md)
+
+### Frontend (React, Angular, Vue, etc.)
+
+```bash
+npm install @ackplus/nest-crud-request
+```
+
+```typescript
+import { QueryBuilder, WhereOperatorEnum, OrderDirectionEnum } from '@ackplus/nest-crud-request';
+
+// Build complex queries
+const query = new QueryBuilder()
+  .where('isActive', WhereOperatorEnum.EQ, true)
+  .andWhere('role', WhereOperatorEnum.IN, ['admin', 'moderator'])
+  .addRelation('posts', ['id', 'title'])
+  .setSkip(0)
+  .setTake(10)
+  .addOrder('createdAt', OrderDirectionEnum.DESC);
+
+// Convert to query parameters
+const params = query.toObject();
+
+// Use with any HTTP client
+const response = await fetch(`/api/users?${new URLSearchParams(params)}`);
+```
+
+[📖 Full Frontend Documentation](./packages/nest-crud-request/README.md)
 
 ## 📚 Documentation
 
 ### Package Documentation
 
-- **[📖 Complete Documentation](./packages/nest-crud/README.md)** - Full guide with all features and examples
-- **[⚡ Quick Start (5 min)](./packages/nest-crud/QUICKSTART.md)** - Get up and running fast
-- **[🤝 Contributing Guide](./packages/nest-crud/CONTRIBUTING.md)** - Help improve the project
-- **[📁 Examples](./packages/nest-crud/examples/)** - Template files you can copy
+- **[@ackplus/nest-crud](./packages/nest-crud/README.md)** - Backend CRUD operations for NestJS
+  - [Examples](./packages/nest-crud/examples/) - Backend examples
+- **[@ackplus/nest-crud-request](./packages/nest-crud-request/README.md)** - Frontend query builder
+  - [React Examples](./packages/nest-crud-request/examples/react/) - React integration
+  - [Angular Examples](./packages/nest-crud-request/examples/angular/) - Angular integration
+  - [Vue Examples](./packages/nest-crud-request/examples/vue/) - Vue integration
 
 ### Example Application
 
 See a complete working example:
-- **[Example App](./apps/example-app/)** - TypeORM + SQLite with tests
-- Run: `cd apps/example-app && pnpm seed`
+- **[Example App](./apps/example-app/)** - Full-stack example with NestJS + TypeORM + SQLite
+- API with User and Post entities
+- Comprehensive query examples
+- Database seeding
+- Tests
 
-## 🛠️ Local Development
+## 🎯 Features
 
-This section is for contributors working on the package itself.
+### Backend Features (nest-crud)
+
+```typescript
+// Automatic endpoints with all features:
+
+// Advanced filtering
+GET /users?where={"isActive":{"$eq":true},"role":{"$in":["admin","moderator"]}}
+
+// Relations
+GET /users?relations={"posts":{"select":["id","title"],"where":{"published":{"$eq":true}}}}
+
+// Pagination
+GET /users?skip=0&take=10
+
+// Sorting
+GET /users?order={"createdAt":"DESC","email":"ASC"}
+
+// Field selection
+GET /users?select=["id","email","firstName"]
+
+// Combine everything
+GET /users?where={"isActive":{"$eq":true}}&relations=["posts"]&skip=0&take=10&order={"createdAt":"DESC"}
+```
+
+### Frontend Features (nest-crud-request)
+
+```typescript
+// Fluent API for building queries
+
+// Simple query
+const query = new QueryBuilder()
+  .where('email', 'john@example.com')
+  .toObject();
+
+// Complex query
+const query = new QueryBuilder()
+  .where((builder) => {
+    builder
+      .where('email', WhereOperatorEnum.ILIKE, '%@example.com')
+      .orWhere('firstName', WhereOperatorEnum.ILIKE, '%john%');
+  })
+  .addRelation('posts')
+  .setSkip(0)
+  .setTake(20)
+  .addOrder('createdAt', OrderDirectionEnum.DESC)
+  .toObject();
+
+// Use with any framework
+const params = new URLSearchParams(query);
+const users = await axios.get(`/api/users?${params}`);
+```
+
+## 🔧 Query Operators
+
+Both packages support these operators:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `$eq` | Equal | `{"age":{"$eq":25}}` |
+| `$ne` | Not equal | `{"status":{"$ne":"banned"}}` |
+| `$gt` | Greater than | `{"age":{"$gt":18}}` |
+| `$gte` | Greater than or equal | `{"age":{"$gte":18}}` |
+| `$lt` | Less than | `{"age":{"$lt":65}}` |
+| `$lte` | Less than or equal | `{"age":{"$lte":65}}` |
+| `$in` | In array | `{"role":{"$in":["admin","mod"]}}` |
+| `$notIn` | Not in array | `{"role":{"$notIn":["banned"]}}` |
+| `$like` | Like (case-sensitive) | `{"email":{"$like":"%@gmail.com"}}` |
+| `$iLike` | Like (case-insensitive) | `{"name":{"$iLike":"%john%"}}` |
+| `$isNull` | Is null | `{"deletedAt":{"$isNull":true}}` |
+| `$isNotNull` | Is not null | `{"deletedAt":{"$isNotNull":true}}` |
+| `$between` | Between | `{"age":{"$between":[18,65]}}` |
+| `$and` | Logical AND | `{"$and":[{...},{...}]}` |
+| `$or` | Logical OR | `{"$or":[{...},{...}]}` |
+
+## 🛠️ Development
 
 ### Setup
 
@@ -134,11 +218,8 @@ cd nest-crud
 # Install dependencies
 pnpm install
 
-# Build package
-pnpm -C packages/nest-crud build
-
-# Run tests
-pnpm -C apps/example-app test
+# Build packages
+pnpm build:packages
 ```
 
 ### Project Structure
@@ -146,106 +227,170 @@ pnpm -C apps/example-app test
 ```
 nest-crud/
 ├── packages/
-│   └── nest-crud/          # 📦 Main package
-│       ├── src/              # Source code
-│       ├── dist/             # Compiled output
-│       ├── examples/         # Example templates
-│       └── README.md         # Package documentation
+│   ├── nest-crud/              # Backend CRUD package
+│   │   ├── src/                  # Source code
+│   │   ├── examples/             # Backend examples
+│   │   └── README.md             # Package documentation
+│   └── nest-crud-request/      # Frontend query builder
+│       ├── src/                  # Source code
+│       ├── examples/             # Frontend examples (React, Angular, Vue)
+│       └── README.md             # Package documentation
 ├── apps/
-│   └── example-app/          # 🧪 Example application
-│       ├── src/              # Working example
-│       └── seeder.config.ts  # CLI configuration
+│   └── example-app/            # Full-stack example
+│       ├── src/
+│       │   ├── users/            # User CRUD module
+│       │   ├── posts/            # Post CRUD module
+│       │   └── database/         # Entities, seeders
+│       └── README.md             # Example documentation
 ├── scripts/
-│   └── publish.js            # Publishing script
-└── package.json              # Root workspace
+│   └── publish.js              # Publishing script
+└── package.json                # Root workspace
 ```
 
 ### Development Workflow
 
 ```bash
-# Build package
+# Build all packages
+pnpm build:packages
+
+# Build specific package
 pnpm -C packages/nest-crud build
+pnpm -C packages/nest-crud-request build
 
 # Run example app
 cd apps/example-app
-pnpm seed                # Seed database
-pnpm seed:refresh        # Drop and reseed
-pnpm seed:watch          # Watch mode
-pnpm test                # Run tests
-pnpm start:dev           # Start app
+pnpm seed                       # Seed database
+pnpm start:dev                  # Start API server
 
-# Make changes and test
-pnpm -C packages/nest-crud build
+# Run tests
+pnpm -C packages/nest-crud test
+pnpm -C packages/nest-crud-request test
 pnpm -C apps/example-app test
-```
-
-### Watch Mode (Multi-Terminal)
-
-For active development, run these in separate terminals:
-
-```bash
-# Terminal 1: Build watch
-pnpm -C packages/nest-crud build --watch
-
-# Terminal 2: Test watch
-pnpm -C apps/example-app test:watch
-
-# Terminal 3: Seed watch
-pnpm -C apps/example-app seed:watch
-```
-
-### Publishing
-
-```bash
-# Interactive version bump and publish
-npm run publish
-
-# The script will:
-# 1. Ask for version type (patch/minor/major)
-# 2. Build package
-# 3. Update version
-# 4. Publish to npm
 ```
 
 ## 🧪 Testing
 
 ```bash
-# Package tests
+# Test all packages
+pnpm test
+
+# Test specific package
 pnpm -C packages/nest-crud test
+pnpm -C packages/nest-crud-request test
 
-# Example app tests
-pnpm -C apps/example-app test
-pnpm -C apps/example-app test:cov
+# Test with coverage
+pnpm -C packages/nest-crud test:cov
+```
 
-# E2E tests
-pnpm -C apps/example-app test:e2e
+## 📖 Examples
+
+### Backend Example (NestJS)
+
+```typescript
+// Complete CRUD setup in 3 files
+
+// 1. Entity
+@Entity('users')
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  email: string;
+
+  @OneToMany(() => Post, post => post.author)
+  posts: Post[];
+}
+
+// 2. Service
+@Injectable()
+export class UserService extends CrudService<User> {
+  constructor(
+    @InjectRepository(User)
+    protected repository: Repository<User>,
+  ) {
+    super(repository);
+  }
+}
+
+// 3. Controller
+@Crud({
+  entity: User,
+  routes: {
+    findAll: true,
+    findOne: true,
+    create: true,
+    update: true,
+    delete: true,
+  },
+})
+@Controller('users')
+export class UserController {
+  constructor(public service: UserService) {}
+}
+```
+
+### Frontend Example (React)
+
+```typescript
+import { QueryBuilder, WhereOperatorEnum, OrderDirectionEnum } from '@ackplus/nest-crud-request';
+
+function UserList() {
+  const [users, setUsers] = useState([]);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const query = new QueryBuilder()
+        .where('isActive', WhereOperatorEnum.EQ, true)
+        .addRelation('posts')
+        .setSkip(page * 10)
+        .setTake(10)
+        .addOrder('createdAt', OrderDirectionEnum.DESC);
+
+      const params = query.toObject();
+      const response = await fetch(`/api/users?${new URLSearchParams(params)}`);
+      const data = await response.json();
+      setUsers(data);
+    };
+
+    fetchUsers();
+  }, [page]);
+
+  return (
+    <div>
+      {users.map(user => (
+        <div key={user.id}>{user.email}</div>
+      ))}
+    </div>
+  );
+}
 ```
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [Contributing Guide](./packages/nest-crud/CONTRIBUTING.md).
+Contributions are welcome! Please follow these steps:
 
-**Quick steps:**
-1. Fork the repo
+1. Fork the repository
 2. Create a branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Build and test (`pnpm -C packages/nest-crud build && pnpm -C apps/example-app test`)
+4. Build and test (`pnpm build:packages && pnpm test`)
 5. Commit changes (`git commit -m 'Add amazing feature'`)
 6. Push to branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
 ## 📄 License
 
-MIT License - see [LICENSE](./packages/nest-crud/LICENSE)
+MIT License
 
 ## 🔗 Links
 
-- **[NPM Package](https://www.npmjs.com/package/@ackplus/nest-crud)**
+- **NPM Packages:**
+  - [@ackplus/nest-crud](https://www.npmjs.com/package/@ackplus/nest-crud)
+  - [@ackplus/nest-crud-request](https://www.npmjs.com/package/@ackplus/nest-crud-request)
 - **[GitHub Repository](https://github.com/ackplus/nest-crud)**
-- **[Full Documentation](./packages/nest-crud/README.md)**
-- **[Quick Start Guide](./packages/nest-crud/QUICKSTART.md)**
 - **[Issue Tracker](https://github.com/ackplus/nest-crud/issues)**
 
 ---
 
-Made with ❤️ for the NestJS community
+Made with ❤️ for the NestJS and frontend communities

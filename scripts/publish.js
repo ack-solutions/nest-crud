@@ -5,8 +5,11 @@ const path = require("path");
 const { execSync } = require("child_process");
 const readline = require("readline");
 
-const PACKAGE_PATH = path.join(__dirname, "../packages/nest-crud/package.json");
-const PACKAGE_DIR = path.dirname(PACKAGE_PATH);
+// Package paths
+const NEST_CRUD_PATH = path.join(__dirname, "../packages/nest-crud/package.json");
+const NEST_CRUD_REQUEST_PATH = path.join(__dirname, "../packages/nest-crud-request/package.json");
+const NEST_CRUD_DIR = path.dirname(NEST_CRUD_PATH);
+const NEST_CRUD_REQUEST_DIR = path.dirname(NEST_CRUD_REQUEST_PATH);
 
 // Create readline interface
 const rl = readline.createInterface({
@@ -22,9 +25,9 @@ function closeReadline() {
   rl.close();
 }
 
-// Get current version from package.json
+// Get current version from nest-crud package.json (master version)
 function getCurrentVersion() {
-  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, "utf8"));
+  const packageJson = JSON.parse(fs.readFileSync(NEST_CRUD_PATH, "utf8"));
   return packageJson.version;
 }
 
@@ -78,30 +81,46 @@ async function selectVersionType(currentVersion) {
   return versionType;
 }
 
-// Build package
-function buildPackage() {
-  console.log("🔨 Building package...\n");
+// Build packages
+function buildPackages() {
+  console.log("🔨 Building packages...\n");
   try {
-    execSync("pnpm build", { cwd: PACKAGE_DIR, stdio: "inherit" });
-    console.log("\n✅ Build completed successfully\n");
+    // Build nest-crud
+    console.log("📦 Building @ackplus/nest-crud...");
+    execSync("pnpm exec tsc -p tsconfig.build.json", { cwd: NEST_CRUD_DIR, stdio: "inherit" });
+    
+    // Build nest-crud-request
+    console.log("\n📦 Building @ackplus/nest-crud-request...");
+    execSync("pnpm exec tsc -p tsconfig.build.json", { cwd: NEST_CRUD_REQUEST_DIR, stdio: "inherit" });
+    
+    console.log("\n✅ All packages built successfully\n");
   } catch (error) {
     console.error("❌ Build failed");
     process.exit(1);
   }
 }
 
-// Update version in package.json
-function updateVersion(versionType) {
-  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, "utf8"));
-  const oldVersion = packageJson.version;
-  const newVersion = calculateVersion(oldVersion, versionType);
+// Update version in both package.json files
+function updateVersions(versionType) {
+  const newVersion = calculateVersion(getCurrentVersion(), versionType);
 
-  console.log("📦 Updating package version...\n");
-  packageJson.version = newVersion;
-  fs.writeFileSync(PACKAGE_PATH, JSON.stringify(packageJson, null, 2) + "\n");
+  console.log("📦 Updating package versions...\n");
 
-  console.log(`✅ Updated @ackplus/nest-crud from ${oldVersion} to ${newVersion}\n`);
-  return { oldVersion, newVersion };
+  // Update nest-crud
+  const nestCrudJson = JSON.parse(fs.readFileSync(NEST_CRUD_PATH, "utf8"));
+  const oldNestCrudVersion = nestCrudJson.version;
+  nestCrudJson.version = newVersion;
+  fs.writeFileSync(NEST_CRUD_PATH, JSON.stringify(nestCrudJson, null, 2) + "\n");
+  console.log(`✅ Updated @ackplus/nest-crud from ${oldNestCrudVersion} to ${newVersion}`);
+
+  // Update nest-crud-request
+  const nestCrudRequestJson = JSON.parse(fs.readFileSync(NEST_CRUD_REQUEST_PATH, "utf8"));
+  const oldNestCrudRequestVersion = nestCrudRequestJson.version;
+  nestCrudRequestJson.version = newVersion;
+  fs.writeFileSync(NEST_CRUD_REQUEST_PATH, JSON.stringify(nestCrudRequestJson, null, 2) + "\n");
+  console.log(`✅ Updated @ackplus/nest-crud-request from ${oldNestCrudRequestVersion} to ${newVersion}\n`);
+
+  return { oldVersion: oldNestCrudVersion, newVersion };
 }
 
 // Ensure NPM authentication
@@ -116,26 +135,45 @@ async function ensureNpmAuth() {
   }
 }
 
-// Publish package
-async function publishPackage() {
+// Publish a single package
+async function publishSinglePackage(packageName, packageDir) {
   try {
-    console.log("📦 Publishing to npm...\n");
+    console.log(`📦 Publishing ${packageName}...`);
     execSync("npm publish --access public", { 
-      cwd: PACKAGE_DIR,
+      cwd: packageDir,
       stdio: "inherit" 
     });
-    console.log("\n✅ Published successfully!\n");
+    console.log(`✅ ${packageName} published successfully!\n`);
     return true;
   } catch (error) {
-    console.error("❌ Publish failed\n");
+    console.error(`❌ Failed to publish ${packageName}\n`);
     return false;
   }
+}
+
+// Publish both packages
+async function publishPackages() {
+  console.log("🚀 Publishing packages to npm...\n");
+
+  // Publish nest-crud
+  const nestCrudSuccess = await publishSinglePackage("@ackplus/nest-crud", NEST_CRUD_DIR);
+  if (!nestCrudSuccess) {
+    return false;
+  }
+
+  // Publish nest-crud-request
+  const nestCrudRequestSuccess = await publishSinglePackage("@ackplus/nest-crud-request", NEST_CRUD_REQUEST_DIR);
+  if (!nestCrudRequestSuccess) {
+    return false;
+  }
+
+  return true;
 }
 
 // Main execution
 async function main() {
   try {
-    console.log("🚀 Starting publish process...\n");
+    console.log("🚀 Starting publish process for both packages...\n");
 
     // Get current version
     const currentVersion = getCurrentVersion();
@@ -147,9 +185,12 @@ async function main() {
 
     // Show summary and confirm
     console.log(`📋 Summary:`);
-    console.log(`   Current: ${currentVersion}`);
-    console.log(`   New:     ${newVersion}`);
-    console.log(`   Type:    ${versionType}\n`);
+    console.log(`   Current version:  ${currentVersion}`);
+    console.log(`   New version:      ${newVersion}`);
+    console.log(`   Type:             ${versionType}`);
+    console.log(`   Packages:         @ackplus/nest-crud`);
+    console.log(`                     @ackplus/nest-crud-request\n`);
+    console.log(`⚠️  Both packages will be published with the same version to avoid conflicts.\n`);
 
     const confirm = await question("❓ Proceed with publish? (Y/n): ");
     if (confirm.toLowerCase() === "n" || confirm.toLowerCase() === "no") {
@@ -158,11 +199,11 @@ async function main() {
       return;
     }
 
-    // Build
-    buildPackage();
+    // Build packages
+    buildPackages();
 
-    // Update version
-    const versionInfo = updateVersion(versionType);
+    // Update versions
+    const versionInfo = updateVersions(versionType);
 
     // Ensure npm auth
     const isAuthenticated = await ensureNpmAuth();
@@ -172,15 +213,17 @@ async function main() {
       return;
     }
 
-    // Publish
-    const success = await publishPackage();
+    // Publish packages
+    const success = await publishPackages();
 
     if (success) {
-      console.log("🎉 Package published successfully!\n");
-      console.log(`📦 https://www.npmjs.com/package/@ackplus/nest-crud/v/${versionInfo.newVersion}`);
+      console.log("🎉 All packages published successfully!\n");
+      console.log(`📦 Package Links:`);
+      console.log(`   https://www.npmjs.com/package/@ackplus/nest-crud/v/${versionInfo.newVersion}`);
+      console.log(`   https://www.npmjs.com/package/@ackplus/nest-crud-request/v/${versionInfo.newVersion}`);
       console.log(`\n📥 Install with:`);
-      console.log(`   npm install @ackplus/nest-crud@${versionInfo.newVersion}`);
-      console.log(`   pnpm add @ackplus/nest-crud@${versionInfo.newVersion}\n`);
+      console.log(`   npm install @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}`);
+      console.log(`   pnpm add @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}\n`);
     }
 
   } catch (error) {

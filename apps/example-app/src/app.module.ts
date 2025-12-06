@@ -4,8 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { User } from './database/entities/user.entity';
 import { Post } from './database/entities/post.entity';
-import { UserSeeder } from './database/seeders/user.seeder';
-import { PostSeeder } from './database/seeders/post.seeder';
+import { UserModule } from './users/user.module';
+import { PostModule } from './posts/post.module';
 
 @Module({
   imports: [
@@ -16,7 +16,8 @@ import { PostSeeder } from './database/seeders/post.seeder';
       synchronize: true,
       logging: false,
     }),
-    TypeOrmModule.forFeature([User, Post]),
+    UserModule,
+    PostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,18 +1,35 @@
 {
-  "name": "nest-crud",
+  "name": "nest-crud-monorepo",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Monorepo for @ackplus/nest-crud and @ackplus/nest-crud-request packages",
   "private": true,
   "scripts": {
-    "build:packages": "pnpm -C packages/nest-crud build && pnpm -C packages/nest-crud-request build",
+    "build:nest-crud": "pnpm -C packages/nest-crud build",
+    "build:nest-crud-request": "pnpm -C packages/nest-crud-request build",
+    "build:packages": "pnpm build:nest-crud && pnpm build:nest-crud-request",
     "build:example": "pnpm -C apps/example-app build",
     "build": "pnpm build:packages && pnpm build:example",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "publish": "node scripts/publish.js"
+    "test:nest-crud": "pnpm -C packages/nest-crud test",
+    "test:nest-crud-request": "pnpm -C packages/nest-crud-request test",
+    "test:example": "pnpm -C apps/example-app test",
+    "test": "pnpm test:nest-crud && pnpm test:nest-crud-request && pnpm test:example",
+    "publish:packages": "node scripts/publish.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.21.0"
+  "keywords": [
+    "nestjs",
+    "crud",
+    "typeorm",
+    "query-builder",
+    "rest-api"
+  ],
+  "author": "Ackplus",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ackplus/nest-crud"
+  },
+  "packageManager": "pnpm@10.21.0",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
 }
