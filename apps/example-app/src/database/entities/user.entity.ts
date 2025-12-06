@@ -1,16 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { BaseEntity } from '@ackplus/nest-crud';
 import { Post } from './post.entity';
 
 @Entity('users')
-export class User {
-  @ApiProperty({ 
-    description: 'User ID',
-    example: 1
-  })
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class User extends BaseEntity {
   @ApiProperty({ 
     description: 'User email address (unique)',
     example: 'john@example.com'
@@ -63,19 +57,5 @@ export class User {
   })
   @OneToMany(() => Post, (post) => post.author)
   posts: Post[];
-
-  @ApiProperty({ 
-    description: 'Creation timestamp',
-    example: '2024-01-01T00:00:00.000Z'
-  })
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @ApiProperty({ 
-    description: 'Last update timestamp',
-    example: '2024-01-01T00:00:00.000Z'
-  })
-  @UpdateDateColumn()
-  updatedAt: Date;
 }
 

@@ -8,7 +8,7 @@ import { PostService } from './post.service';
 @Crud({
   entity: Post,
   routes: {
-    findAll: true,
+    findMany: true,
     findOne: true,
     create: true,
     update: true,

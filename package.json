@@ -13,7 +13,7 @@
     "test:nest-crud-request": "pnpm -C packages/nest-crud-request test",
     "test:example": "pnpm -C apps/example-app test",
     "test": "pnpm test:nest-crud && pnpm test:nest-crud-request && pnpm test:example",
-    "publish:packages": "node scripts/publish.js"
+    "publish": "node scripts/publish.js"
   },
   "keywords": [
     "nestjs",

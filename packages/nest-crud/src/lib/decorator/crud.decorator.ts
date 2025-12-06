@@ -5,6 +5,7 @@ import { CrudOptions } from '../interface/crud';
 
 
 export const Crud = (options: CrudOptions) => (target: any): void => {
-    Controller(options.path || options.name)(target);
+    const name = options.name || options.entity?.name || target.name;
+    Controller(options.path || name)(target);
     CrudRoutesFactory.create(target, options);
 };

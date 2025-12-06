@@ -8,7 +8,7 @@ import { UserService } from './user.service';
 @Crud({
   entity: User,
   routes: {
-    findAll: true,
+    findMany: true,
     findOne: true,
     create: true,
     update: true,

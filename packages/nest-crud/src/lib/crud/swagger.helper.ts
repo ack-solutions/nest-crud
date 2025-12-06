@@ -92,7 +92,7 @@ export class ValidationErrorResponseDto extends ErrorResponseDto {
             },
         ],
     } as any)
-    message: string | string[] | Record<string, string[]>;
+    declare message: string | string[] | Record<string, string[]>;
 }
 
 export class MessageResponseDto {
@@ -396,7 +396,7 @@ export class Swagger {
                     successResponse = {
                         [HttpStatus.OK]: {
                             description: 'Successfully retrieved items with pagination',
-                            schema: isValidEntityType && getSchemaPath
+                            schema: isValidEntityType
                                 ? {
                                     type: 'object',
                                     properties: {

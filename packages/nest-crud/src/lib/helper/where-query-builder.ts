@@ -147,7 +147,7 @@ export class WhereQueryBuilder {
 
         // Return empty query if input is empty
         if (!condition || !Object.keys(condition).length) {
-            return { query: null, params: {} };
+            return { query: '', params: {} };
         }
 
         for (const key in condition) {
@@ -157,7 +157,7 @@ export class WhereQueryBuilder {
             if (key === '$and' || key === '$or') {
                 if (!Array.isArray(value) || !value.length) continue;
 
-                const subParts = [];
+                const subParts: string[] = [];
                 for (const sub of value) {
                     const { query, params: subParams } = this.buildWhereQueryAndParams(sub);
                     if (query) {
@@ -198,7 +198,7 @@ export class WhereQueryBuilder {
         }
 
         const result = {
-            query: queryParts.length ? queryParts.join(' AND ') : null,
+            query: queryParts.length ? queryParts.join(' AND ') : '',
             params,
         };
         this.logger.log('Nested condition result', result);

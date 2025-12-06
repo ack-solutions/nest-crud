@@ -133,7 +133,7 @@ export class RequestQueryParser {
             return isNaN(parsed) ? 0 : parsed;
         }
 
-        return null
+        return 0;
     }
 
     /**

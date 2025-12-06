@@ -29,7 +29,7 @@ import { QueryBuilderHelper } from './query-builder-helper';
  * ];
  * ```
  */
-export class JoinQueryBuilder<T> {
+export class JoinQueryBuilder<T extends ObjectLiteral> {
 
     private builder: SelectQueryBuilder<T>;
 
@@ -111,7 +111,7 @@ export class JoinQueryBuilder<T> {
 
             let columns: string[] = [];
             if (allowedRelation.allowedColumns) {
-                columns = isArrayFull(options.select)
+                columns = isArrayFull(options.select) && options.select
                     ? options.select.filter((column) => allowedRelation.allowedColumns.some((allowed) => allowed === column))
                     : allowedRelation.allowedColumns;
             }
@@ -146,13 +146,13 @@ export class JoinQueryBuilder<T> {
             }
 
             // Add selected columns
-            if (isArrayFull(options.select)) {
+            if (isArrayFull(options.select) && options.select) {
                 // Use explicitly provided select columns
                 const filteredColumns = allowedRelation.allowedColumns
                     ? options.select.filter((column) => allowedRelation.allowedColumns.some((allowed) => allowed === column))
                     : options.select;
 
-                const select = filteredColumns.map(col => `${currentAlias}.${col}`);
+                const select = (filteredColumns || []).map(col => `${currentAlias}.${col}`);
                 for (const field of select) {
                     this.helper.selectedFields.add(field);
                 }

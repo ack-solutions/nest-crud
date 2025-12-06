@@ -217,8 +217,8 @@ export class CrudService<T extends BaseEntity> {
 
         result.total = total;
         result.data = response.map(item => ({
-            count: Number(item.count) || 0,
             ...item,
+            count: Number(item.count) || 0,
         }));
         return result;
     }
@@ -334,6 +334,11 @@ export class CrudService<T extends BaseEntity> {
     }
 
     async deleteMany(params: IDeleteManyOptions, softDelete?: boolean, ..._others: any) {
+        if (!params.ids || params.ids.length === 0) {
+            return {
+                message: 'No items to delete',
+            };
+        }
         const ids = await this.beforeDeleteMany(params.ids);
         if (ids?.length > 0) {
             if (softDelete) {
@@ -374,6 +379,12 @@ export class CrudService<T extends BaseEntity> {
     }
 
     async deleteFromTrashMany(params: IDeleteManyOptions, ..._others: any[]) {
+        if (!params.ids || params.ids.length === 0) {
+            return {
+                success: true,
+                message: 'No items to delete',
+            };
+        }
         const ids = await this.beforeDeleteFromTrashMany(params.ids);
         if (ids?.length > 0) {
             await this.repository.delete({ id: In(ids) as any });

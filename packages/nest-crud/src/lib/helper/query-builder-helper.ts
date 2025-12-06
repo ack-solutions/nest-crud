@@ -5,7 +5,7 @@ import { normalizeColumnName } from '../utils';
  * Shared helper class for query builders to handle common entity metadata,
  * alias resolution, and database operations.
  */
-export class QueryBuilderHelper<T> {
+export class QueryBuilderHelper<T extends ObjectLiteral> {
 
     public selectedFields: Set<string> = new Set();
     public readonly dbType: string;
@@ -116,10 +116,10 @@ export class QueryBuilderHelper<T> {
                 allowedRelation = this.entityRelationsHash.get(field);
             } else {
                 const fields = field.split('.');
-                let relationMetadata: EntityMetadata;
-                let name: string;
-                let path: string;
-                let parentPath: string;
+                let relationMetadata: EntityMetadata | null = null;
+                let name: string = '';
+                let path: string = '';
+                let parentPath: string = '';
 
                 if (fields.length === 1) {
                     const found = this.repository.metadata.relations.find((one) => one.propertyName === fields[0]);

@@ -1,10 +1,22 @@
 {
   "name": "@ackplus/nest-crud",
-  "version": "1.1.15",
+  "version": "1.1.16",
   "description": "Powerful CRUD operations for NestJS with TypeORM - automatic REST endpoints, advanced filtering, relations, pagination, and more",
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "nestjs",
     "crud",
@@ -25,7 +37,11 @@
   "license": "MIT",
   "author": "Ackplus",
   "dependencies": {
-    "pluralize": "^8.0.0"
+    "pluralize": "^8.0.0",
+    "deepmerge": "^4.3.1",
+    "lodash": "^4.17.21",
+    "qs": "^6.11.2",
+    "@ackplus/nest-crud-request": "workspace:*"
   },
   "peerDependencies": {
     "@nestjs/common": "^10 || ^11",
@@ -37,5 +53,11 @@
     "typeorm": "^0.3.21",
     "reflect-metadata": "^0.1.13",
     "class-transformer": "^0.5.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/deepmerge": "^2.2.0",
+    "@types/lodash": "^4.17.0",
+    "@types/qs": "^6.9.12"
   }
 }

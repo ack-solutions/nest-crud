@@ -1,4 +1,4 @@
-import { Repository, FindManyOptions, SelectQueryBuilder, Not, IsNull } from 'typeorm';
+import { Repository, FindManyOptions, SelectQueryBuilder, Not, IsNull, ObjectLiteral } from 'typeorm';
 
 import { IFindManyOptions } from '../interface/crud';
 import { WhereQueryBuilder } from './where-query-builder';
@@ -6,7 +6,7 @@ import { JoinQueryBuilder } from './join-query-builder';
 import { QueryBuilderHelper } from './query-builder-helper';
 import { OrderDirectionEnum } from '@ackplus/nest-crud-request';
 
-export class FindQueryBuilder<T> {
+export class FindQueryBuilder<T extends ObjectLiteral> {
 
     private builder: SelectQueryBuilder<T>;
     private whereQueryBuilder: WhereQueryBuilder;

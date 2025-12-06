@@ -21,7 +21,7 @@ export interface RouteOptions {
 
 export type RouteOptionsWithName = RouteOptions & { name: CrudActionsEnum };
 
-export type CrudRoutesOptions = Record<CrudActionsEnum, Partial<RouteOptions>>;
+export type CrudRoutesOptions = Record<CrudActionsEnum, Partial<RouteOptions> | boolean>;
 
 export interface CrudQueryOptions {
     relations?: string[];
@@ -29,7 +29,7 @@ export interface CrudQueryOptions {
 
 export interface CrudOptions {
     debug?: boolean;
-    name: string;
+    name?: string;
     path?: string;
     select?: string[];
     hiddenFields?: string[];

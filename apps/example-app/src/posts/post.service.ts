@@ -8,7 +8,7 @@ import { Post } from '../database/entities/post.entity';
 export class PostService extends CrudService<Post> {
   constructor(
     @InjectRepository(Post)
-    protected repository: Repository<Post>,
+    public repository: Repository<Post>,
   ) {
     super(repository);
   }

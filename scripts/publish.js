@@ -87,11 +87,11 @@ function buildPackages() {
   try {
     // Build nest-crud
     console.log("📦 Building @ackplus/nest-crud...");
-    execSync("pnpm exec tsc -p tsconfig.build.json", { cwd: NEST_CRUD_DIR, stdio: "inherit" });
+    execSync("pnpm build", { cwd: NEST_CRUD_DIR, stdio: "inherit" });
     
     // Build nest-crud-request
     console.log("\n📦 Building @ackplus/nest-crud-request...");
-    execSync("pnpm exec tsc -p tsconfig.build.json", { cwd: NEST_CRUD_REQUEST_DIR, stdio: "inherit" });
+    execSync("pnpm build", { cwd: NEST_CRUD_REQUEST_DIR, stdio: "inherit" });
     
     console.log("\n✅ All packages built successfully\n");
   } catch (error) {
