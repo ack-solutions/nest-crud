@@ -1,8 +1,11 @@
 {
-  "extends": "./tsconfig.lib.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist",
+    "outDir": "../../dist/packages/nest-crud",
     "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "types": ["node"]
   },
   "include": ["src/**/*"],

@@ -50,12 +50,23 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION from tag: $TAG_NAME"
       
-      - name: Update package version and prepare for publish
+      - name: Update package versions and prepare for publish
         run: |
-          cd packages/nest-crud
-          # Update version
-          pnpm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version --no-commit-hooks
-          # Remove private field if present (required for publishing)
+          VERSION=${{ steps.extract_version.outputs.version }}
+          # Update nest-crud-request version first (dependency)
+          cd packages/nest-crud-request
+          pnpm version $VERSION --no-git-tag-version --no-commit-hooks
+          # Remove private field if present
+          node -e "const pkg = require('./package.json'); delete pkg.private; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          # Update license if it's UNLICENSED
+          node -e "const pkg = require('./package.json'); if (pkg.license === 'UNLICENSED') { pkg.license = 'ISC'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
+          
+          # Update nest-crud version
+          cd ../nest-crud
+          pnpm version $VERSION --no-git-tag-version --no-commit-hooks
+          # Replace workspace dependency with actual version
+          node -e "const pkg = require('./package.json'); if (pkg.dependencies && pkg.dependencies['@ackplus/nest-crud-request']) { pkg.dependencies['@ackplus/nest-crud-request'] = '$VERSION'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
+          # Remove private field if present
           node -e "const pkg = require('./package.json'); delete pkg.private; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
           # Update license if it's UNLICENSED
           node -e "const pkg = require('./package.json'); if (pkg.license === 'UNLICENSED') { pkg.license = 'ISC'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
@@ -63,10 +74,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Build package
-        run: pnpm -C packages/nest-crud build
+      - name: Build packages
+        run: |
+          # Build nest-crud-request first (dependency)
+          pnpm -C packages/nest-crud-request build
+          # Build nest-crud
+          pnpm -C packages/nest-crud build
       
-      - name: Publish to npm
+      - name: Publish nest-crud-request to npm
+        run: |
+          cd packages/nest-crud-request
+          pnpm publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Publish nest-crud to npm
         run: |
           cd packages/nest-crud
           pnpm publish --access public --no-git-checks --provenance

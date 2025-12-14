@@ -106,19 +106,24 @@ function updateVersions(versionType) {
 
   console.log("📦 Updating package versions...\n");
 
-  // Update nest-crud
-  const nestCrudJson = JSON.parse(fs.readFileSync(NEST_CRUD_PATH, "utf8"));
-  const oldNestCrudVersion = nestCrudJson.version;
-  nestCrudJson.version = newVersion;
-  fs.writeFileSync(NEST_CRUD_PATH, JSON.stringify(nestCrudJson, null, 2) + "\n");
-  console.log(`✅ Updated @ackplus/nest-crud from ${oldNestCrudVersion} to ${newVersion}`);
-
-  // Update nest-crud-request
+  // Update nest-crud-request first (dependency)
   const nestCrudRequestJson = JSON.parse(fs.readFileSync(NEST_CRUD_REQUEST_PATH, "utf8"));
   const oldNestCrudRequestVersion = nestCrudRequestJson.version;
   nestCrudRequestJson.version = newVersion;
   fs.writeFileSync(NEST_CRUD_REQUEST_PATH, JSON.stringify(nestCrudRequestJson, null, 2) + "\n");
-  console.log(`✅ Updated @ackplus/nest-crud-request from ${oldNestCrudRequestVersion} to ${newVersion}\n`);
+  console.log(`✅ Updated @ackplus/nest-crud-request from ${oldNestCrudRequestVersion} to ${newVersion}`);
+
+  // Update nest-crud and replace workspace dependency
+  const nestCrudJson = JSON.parse(fs.readFileSync(NEST_CRUD_PATH, "utf8"));
+  const oldNestCrudVersion = nestCrudJson.version;
+  nestCrudJson.version = newVersion;
+  // Replace workspace dependency with actual version for publishing
+  if (nestCrudJson.dependencies && nestCrudJson.dependencies["@ackplus/nest-crud-request"]) {
+    nestCrudJson.dependencies["@ackplus/nest-crud-request"] = newVersion;
+  }
+  fs.writeFileSync(NEST_CRUD_PATH, JSON.stringify(nestCrudJson, null, 2) + "\n");
+  console.log(`✅ Updated @ackplus/nest-crud from ${oldNestCrudVersion} to ${newVersion}`);
+  console.log(`✅ Replaced workspace dependency with version ${newVersion}\n`);
 
   return { oldVersion: oldNestCrudVersion, newVersion };
 }
@@ -155,15 +160,15 @@ async function publishSinglePackage(packageName, packageDir) {
 async function publishPackages() {
   console.log("🚀 Publishing packages to npm...\n");
 
-  // Publish nest-crud
-  const nestCrudSuccess = await publishSinglePackage("@ackplus/nest-crud", NEST_CRUD_DIR);
-  if (!nestCrudSuccess) {
+  // Publish nest-crud-request first (dependency)
+  const nestCrudRequestSuccess = await publishSinglePackage("@ackplus/nest-crud-request", NEST_CRUD_REQUEST_DIR);
+  if (!nestCrudRequestSuccess) {
     return false;
   }
 
-  // Publish nest-crud-request
-  const nestCrudRequestSuccess = await publishSinglePackage("@ackplus/nest-crud-request", NEST_CRUD_REQUEST_DIR);
-  if (!nestCrudRequestSuccess) {
+  // Publish nest-crud (depends on nest-crud-request)
+  const nestCrudSuccess = await publishSinglePackage("@ackplus/nest-crud", NEST_CRUD_DIR);
+  if (!nestCrudSuccess) {
     return false;
   }
 
