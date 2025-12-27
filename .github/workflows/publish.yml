@@ -1,97 +1,90 @@
-name: Publish Package
+name: Publish Packages (tag)
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on semantic version tags like v1.0.0
-      - '*.*.*'    # Also triggers on version tags without 'v' prefix like 1.0.0
+      - "*.*.*"
+      - "*.*.*-beta*"
+  workflow_dispatch:
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write  # Required for npm provenance
-    
+      contents: write
+      id-token: write
+
     steps:
-      - name: Checkout code
+      - name: Checkout main (full history)
         uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0
+          ref: main
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.21.0
-      
-      - name: Setup Node.js
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-      
-      - name: Get pnpm store directory
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Extract version from tag
+        id: version
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      
-      - name: Extract version from tag
-        id: extract_version
-        run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          # Remove 'v' prefix if present
-          VERSION=${TAG_NAME#v}
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION from tag: $TAG_NAME"
-      
-      - name: Update package versions and prepare for publish
+
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "dist_tag=beta" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ensure tag is from main HEAD
+        shell: bash
         run: |
-          VERSION=${{ steps.extract_version.outputs.version }}
-          # Update nest-crud-request version first (dependency)
-          cd packages/nest-crud-request
-          pnpm version $VERSION --no-git-tag-version --no-commit-hooks
-          # Remove private field if present
-          node -e "const pkg = require('./package.json'); delete pkg.private; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
-          # Update license if it's UNLICENSED
-          node -e "const pkg = require('./package.json'); if (pkg.license === 'UNLICENSED') { pkg.license = 'ISC'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
-          
-          # Update nest-crud version
-          cd ../nest-crud
-          pnpm version $VERSION --no-git-tag-version --no-commit-hooks
-          # Replace workspace dependency with actual version
-          node -e "const pkg = require('./package.json'); if (pkg.dependencies && pkg.dependencies['@ackplus/nest-crud-request']) { pkg.dependencies['@ackplus/nest-crud-request'] = '$VERSION'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
-          # Remove private field if present
-          node -e "const pkg = require('./package.json'); delete pkg.private; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
-          # Update license if it's UNLICENSED
-          node -e "const pkg = require('./package.json'); if (pkg.license === 'UNLICENSED') { pkg.license = 'ISC'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); }"
-      
+          git fetch --tags origin
+          TAG_COMMIT="$(git rev-list -n 1 "$GITHUB_REF")"
+          MAIN_COMMIT="$(git rev-parse origin/main)"
+          [ "$TAG_COMMIT" = "$MAIN_COMMIT" ]
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
-      - name: Build packages
-        run: |
-          # Build nest-crud-request first (dependency)
-          pnpm -C packages/nest-crud-request build
-          # Build nest-crud
-          pnpm -C packages/nest-crud build
-      
-      - name: Publish nest-crud-request to npm
-        run: |
-          cd packages/nest-crud-request
-          pnpm publish --access public --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
-      - name: Publish nest-crud to npm
-        run: |
-          cd packages/nest-crud
-          pnpm publish --access public --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Bump all workspace package versions
+        shell: bash
+        run: |
+          pnpm -r exec npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
+
+      - name: Commit & push version changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "chore(release): v${{ steps.version.outputs.version }}"
+            git push origin main
+          fi
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Publish packages
+        shell: bash
+        run: |
+          pnpm -r publish \
+            --access public \
+            --no-git-checks \
+            --provenance \
+            --tag "${{ steps.version.outputs.dist_tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
