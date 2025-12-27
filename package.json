@@ -4,15 +4,10 @@
   "description": "Monorepo for @ackplus/nest-crud and @ackplus/nest-crud-request packages",
   "private": true,
   "scripts": {
-    "build:nest-crud": "pnpm -C packages/nest-crud build",
-    "build:nest-crud-request": "pnpm -C packages/nest-crud-request build",
-    "build:packages": "pnpm build:nest-crud && pnpm build:nest-crud-request",
-    "build:example": "pnpm -C apps/example-app build",
-    "build": "pnpm build:packages && pnpm build:example",
-    "test:nest-crud": "pnpm -C packages/nest-crud test",
-    "test:nest-crud-request": "pnpm -C packages/nest-crud-request test",
-    "test:example": "pnpm -C apps/example-app test",
-    "test": "pnpm test:nest-crud && pnpm test:nest-crud-request && pnpm test:example",
+    "nest-crud": "pnpm -C packages/nest-crud",
+    "nest-crud-request": "pnpm -C packages/nest-crud-request",
+    "example": "pnpm -C apps/example-app",
+    "build": "pnpm nest-crud build && pnpm nest-crud-request build",
     "publish": "node scripts/publish.js"
   },
   "keywords": [
