@@ -85,13 +85,13 @@ async function selectVersionType(currentVersion) {
 function buildPackages() {
   console.log("🔨 Building packages...\n");
   try {
-    // Build nest-crud
-    console.log("📦 Building @ackplus/nest-crud...");
-    execSync("pnpm build", { cwd: NEST_CRUD_DIR, stdio: "inherit" });
-    
-    // Build nest-crud-request
-    console.log("\n📦 Building @ackplus/nest-crud-request...");
+    // Build nest-crud-request first (dependency)
+    console.log("📦 Building @ackplus/nest-crud-request...");
     execSync("pnpm build", { cwd: NEST_CRUD_REQUEST_DIR, stdio: "inherit" });
+    
+    // Build nest-crud
+    console.log("\n📦 Building @ackplus/nest-crud...");
+    execSync("pnpm build", { cwd: NEST_CRUD_DIR, stdio: "inherit" });
     
     console.log("\n✅ All packages built successfully\n");
   } catch (error) {
@@ -140,15 +140,29 @@ async function ensureNpmAuth() {
   }
 }
 
-// Publish a single package
-async function publishSinglePackage(packageName, packageDir) {
+// Get published version from npm
+function getPublishedVersion(packageName) {
   try {
-    console.log(`📦 Publishing ${packageName}...`);
-    execSync("npm publish --access public", { 
-      cwd: packageDir,
-      stdio: "inherit" 
+    const output = execSync(`npm view ${packageName} version`, { 
+      encoding: "utf8",
+      stdio: "pipe"
     });
-    console.log(`✅ ${packageName} published successfully!\n`);
+    return output.trim();
+  } catch (error) {
+    // Package doesn't exist yet or not accessible
+    return null;
+  }
+}
+
+// Publish a single package
+async function publishSinglePackage(packageName, packageDir, newVersion, tag = "latest") {
+  try {
+    console.log(`📦 Publishing ${packageName}@${newVersion} with tag "${tag}"...`);
+    execSync(`npm publish --access public --tag ${tag}`, {
+      cwd: packageDir,
+      stdio: "inherit"
+    });
+    console.log(`✅ ${packageName}@${newVersion} published successfully with tag "${tag}"!\n`);
     return true;
   } catch (error) {
     console.error(`❌ Failed to publish ${packageName}\n`);
@@ -156,23 +170,50 @@ async function publishSinglePackage(packageName, packageDir) {
   }
 }
 
+// Compare version strings (e.g., "1.2.0" vs "1.1.23")
+function compareVersions(v1, v2) {
+  const parts1 = v1.split(".").map(Number);
+  const parts2 = v2.split(".").map(Number);
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const part1 = parts1[i] || 0;
+    const part2 = parts2[i] || 0;
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+  return 0;
+}
+
 // Publish both packages
-async function publishPackages() {
+async function publishPackages(newVersion) {
   console.log("🚀 Publishing packages to npm...\n");
 
+  // Check published versions
+  const publishedNestCrudRequest = getPublishedVersion("@ackplus/nest-crud-request");
+  const publishedNestCrud = getPublishedVersion("@ackplus/nest-crud");
+  
+  let tag = "latest";
+  
+  // If new version is lower than published, use beta tag
+  if (publishedNestCrud && compareVersions(newVersion, publishedNestCrud) < 0) {
+    console.log(`⚠️  Warning: Published version ${publishedNestCrud} is higher than ${newVersion}`);
+    console.log(`   Publishing with "beta" tag instead of "latest"\n`);
+    tag = "beta";
+  }
+
   // Publish nest-crud-request first (dependency)
-  const nestCrudRequestSuccess = await publishSinglePackage("@ackplus/nest-crud-request", NEST_CRUD_REQUEST_DIR);
+  const nestCrudRequestSuccess = await publishSinglePackage("@ackplus/nest-crud-request", NEST_CRUD_REQUEST_DIR, newVersion, tag);
   if (!nestCrudRequestSuccess) {
     return false;
   }
 
   // Publish nest-crud (depends on nest-crud-request)
-  const nestCrudSuccess = await publishSinglePackage("@ackplus/nest-crud", NEST_CRUD_DIR);
+  const nestCrudSuccess = await publishSinglePackage("@ackplus/nest-crud", NEST_CRUD_DIR, newVersion, tag);
   if (!nestCrudSuccess) {
     return false;
   }
 
-  return true;
+  return { success: true, tag };
 }
 
 // Main execution
@@ -219,16 +260,22 @@ async function main() {
     }
 
     // Publish packages
-    const success = await publishPackages();
+    const publishResult = await publishPackages(versionInfo.newVersion);
 
-    if (success) {
+    if (publishResult && publishResult.success) {
       console.log("🎉 All packages published successfully!\n");
+      const tagSuffix = publishResult.tag !== "latest" ? ` (tag: ${publishResult.tag})` : "";
       console.log(`📦 Package Links:`);
       console.log(`   https://www.npmjs.com/package/@ackplus/nest-crud/v/${versionInfo.newVersion}`);
       console.log(`   https://www.npmjs.com/package/@ackplus/nest-crud-request/v/${versionInfo.newVersion}`);
       console.log(`\n📥 Install with:`);
-      console.log(`   npm install @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}`);
-      console.log(`   pnpm add @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}\n`);
+      if (publishResult.tag === "latest") {
+        console.log(`   npm install @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}`);
+        console.log(`   pnpm add @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion}\n`);
+      } else {
+        console.log(`   npm install @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion} --tag ${publishResult.tag}`);
+        console.log(`   pnpm add @ackplus/nest-crud@${versionInfo.newVersion} @ackplus/nest-crud-request@${versionInfo.newVersion} --tag ${publishResult.tag}\n`);
+      }
     }
 
   } catch (error) {
