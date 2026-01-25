@@ -3,8 +3,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
-    "resolvePackageJsonExports": false
-  },
-  "files": [],
-  "include": []
+    "resolvePackageJsonExports": false,
+    "noEmit": true
+  }
 }

@@ -279,6 +279,55 @@ export class WhereQueryBuilder {
                     params: { [paramName]: value }
                 };
 
+            // Prefix/Suffix matching operators
+            case WhereOperatorEnum.STARTS_WITH:
+                return {
+                    query: this.generateLikeQuery(columnName, paramName, false, false),
+                    params: { [paramName]: `${value}%` }
+                };
+            case WhereOperatorEnum.ENDS_WITH:
+                return {
+                    query: this.generateLikeQuery(columnName, paramName, false, false),
+                    params: { [paramName]: `%${value}` }
+                };
+            case WhereOperatorEnum.ISTARTS_WITH:
+                return {
+                    query: this.generateLikeQuery(columnName, paramName, false, true),
+                    params: { [paramName]: `${value}%` }
+                };
+            case WhereOperatorEnum.IENDS_WITH:
+                return {
+                    query: this.generateLikeQuery(columnName, paramName, false, true),
+                    params: { [paramName]: `%${value}` }
+                };
+
+            // Case-insensitive array operators
+            case WhereOperatorEnum.IN_L:
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                if (value.length === 0) {
+                    return {
+                        query: '1 = 0',
+                        params: {}
+                    }; // Always false for empty IN clause
+                } else {
+                    const textColumn = this.convertToText(columnName);
+                    return {
+                        query: `LOWER(${textColumn}) IN (:...${paramName})`,
+                        params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
+                    };
+                }
+            case WhereOperatorEnum.NOT_IN_L:
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                const textColumn = this.convertToText(columnName);
+                return {
+                    query: `LOWER(${textColumn}) NOT IN (:...${paramName})`,
+                    params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
+                };
+
             // Array operators
             case WhereOperatorEnum.IN:
                 if (Array.isArray(value) && value.length === 0) {
@@ -295,6 +344,42 @@ export class WhereQueryBuilder {
             case WhereOperatorEnum.NOT_IN:
                 return {
                     query: `${columnName} NOT IN (:...${paramName})`,
+                    params: { [paramName]: value }
+                };
+
+            // PostgreSQL array operators
+            case WhereOperatorEnum.CONT_ARR:
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                if (value.length === 0) {
+                    return {
+                        query: '1 = 0',
+                        params: {}
+                    }; // Always false for empty array
+                }
+                if (this.helper.dbType !== 'postgres' && this.helper.dbType !== 'postgresql') {
+                    throw new BadRequestException(`Operator ${operator} is only supported for PostgreSQL`);
+                }
+                return {
+                    query: `${columnName} @> ARRAY[:...${paramName}]::text[]`,
+                    params: { [paramName]: value }
+                };
+            case WhereOperatorEnum.INTERSECTS_ARR:
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                if (value.length === 0) {
+                    return {
+                        query: '1 = 0',
+                        params: {}
+                    }; // Always false for empty array
+                }
+                if (this.helper.dbType !== 'postgres' && this.helper.dbType !== 'postgresql') {
+                    throw new BadRequestException(`Operator ${operator} is only supported for PostgreSQL`);
+                }
+                return {
+                    query: `${columnName} && ARRAY[:...${paramName}]::text[]`,
                     params: { [paramName]: value }
                 };
 

@@ -28,6 +28,14 @@ export enum WhereOperatorEnum {
     NOT_LIKE = '$notLike',
     ILIKE = '$iLike',
     NOT_ILIKE = '$notIlike',
+    STARTS_WITH = '$startsWith',
+    ENDS_WITH = '$endsWith',
+    ISTARTS_WITH = '$iStartsWith',
+    IENDS_WITH = '$iEndsWith',
+    IN_L = '$inL',
+    NOT_IN_L = '$notinL',
+    CONT_ARR = '$contArr', // postgres sql only array operators
+    INTERSECTS_ARR = '$intersectsArr', // postgres sql only array operators
     IS_NULL = '$isNull',
     IS_NOT_NULL = '$isNotNull',
     BETWEEN = '$between',
