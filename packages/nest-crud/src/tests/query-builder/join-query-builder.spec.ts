@@ -4,7 +4,7 @@ import { User } from '../helper/entities/user-test.entity';
 import { createCrudTestApp } from '../helper/testing-module';
 import { INestApplication } from '@nestjs/common';
 import { defaultTestData, seedTestData } from '../helper/seed-data';
-import { RelationOptions } from '@ackplus/nest-crud-request';
+import { RelationOptions } from '../../lib/types';
 import { QueryBuilderHelper } from '../../lib/helper/query-builder-helper';
 import { expectSqlToMatch } from '../helper/test-utils';
 import { FindQueryBuilder } from '../../lib/helper/find-query-builder';

@@ -1,4 +1,4 @@
-import { OrderDirectionEnum } from '@ackplus/nest-crud-request';
+import { OrderDirectionEnum } from '../../lib/types';
 import { DataSource, Repository } from 'typeorm';
 import { FindQueryBuilder } from '../../lib/helper/find-query-builder';
 import { User } from '../helper/entities/user-test.entity';

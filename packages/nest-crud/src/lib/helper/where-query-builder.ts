@@ -1,6 +1,6 @@
 import { SelectQueryBuilder } from 'typeorm';
 
-import { WhereObject, WhereOperatorEnum, WhereOptions } from '@ackplus/nest-crud-request';
+import { WhereObject, WhereOperatorEnum, WhereOptions } from '../types';
 import { QueryBuilderHelper } from './query-builder-helper';
 import { BadRequestException } from '@nestjs/common';
 import { QueryDebugger } from './query-debug.helper';

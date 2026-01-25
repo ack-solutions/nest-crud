@@ -7,7 +7,7 @@
     "nest-crud": "pnpm -C packages/nest-crud",
     "nest-crud-request": "pnpm -C packages/nest-crud-request",
     "example": "pnpm -C apps/example-app",
-    "build": "pnpm nest-crud build && pnpm nest-crud-request build",
+    "build": "pnpm nest-crud-request build && pnpm nest-crud build",
     "publish": "node scripts/publish.js"
   },
   "keywords": [

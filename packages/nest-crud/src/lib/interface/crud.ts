@@ -2,7 +2,7 @@ import {
     OrderDirectionEnum,
     RelationOptions,
     WhereOptions
-} from '@ackplus/nest-crud-request';
+} from '../types';
 import { CanActivate, NestInterceptor, RequestMethod, Type, ValidationPipeOptions } from '@nestjs/common';
 
 

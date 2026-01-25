@@ -1,5 +1,5 @@
 import { DataSource, EntityMetadata, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
-import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions, WhereObject } from '@ackplus/nest-crud-request';
+import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions, WhereObject } from '../types';
 import { WhereQueryBuilder } from './where-query-builder';
 import { isArrayFull, normalizeColumnName } from '../utils';
 import { QueryBuilderHelper } from './query-builder-helper';

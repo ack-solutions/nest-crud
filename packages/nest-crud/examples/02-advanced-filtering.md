@@ -5,7 +5,7 @@ This example demonstrates how to use complex filtering with various operators.
 ## Available Operators
 
 ```typescript
-import { WhereOperatorEnum } from '@ackplus/nest-crud-request';
+import { WhereOperatorEnum } from '@ackplus/nest-crud';
 
 // Comparison operators
 WhereOperatorEnum.EQ          // Equal
@@ -18,6 +18,7 @@ WhereOperatorEnum.LT_OR_EQ    // Less than or equal
 // Array operators
 WhereOperatorEnum.IN          // In array
 WhereOperatorEnum.NOT_IN      // Not in array
+
 
 // String operators
 WhereOperatorEnum.LIKE        // Like (case-sensitive)

@@ -10,6 +10,9 @@ export * from './service/crud-service';
 // Constants
 export * from './constants';
 
+// Types
+export * from './types';
+
 // Helpers
 export * from './helper/find-query-builder';
 export * from './helper/request-query-parser';

@@ -54,16 +54,3 @@ export type RelationObjectValue = {
 export type RelationObject = Record<string, RelationObjectValue | boolean>;
 
 export type RelationOptions = string | string[] | RelationObject;
-
-// QueryBuilderOptions is specific to nest-crud-request
-export interface QueryBuilderOptions {
-    [key: string]: any;
-    select?: string[] | string;
-    relations?: RelationOptions | string;
-    where?: WhereOptions | string;
-    order?: Record<string, OrderDirectionEnum> | string;
-    skip?: number;
-    take?: number;
-    withDeleted?: boolean;
-    onlyDeleted?: boolean;
-}

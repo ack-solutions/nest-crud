@@ -4,7 +4,7 @@ import { IFindManyOptions } from '../interface/crud';
 import { WhereQueryBuilder } from './where-query-builder';
 import { JoinQueryBuilder } from './join-query-builder';
 import { QueryBuilderHelper } from './query-builder-helper';
-import { OrderDirectionEnum } from '@ackplus/nest-crud-request';
+import { OrderDirectionEnum } from '../types';
 
 export class FindQueryBuilder<T extends ObjectLiteral> {
 

@@ -2,6 +2,7 @@ export * from './lib/decorator';
 export * from './lib/nest-crud.module';
 
 // Types
+export * from './lib/types';
 export * from './lib/interface/crud';
 export * from './lib/interface/typeorm';
 

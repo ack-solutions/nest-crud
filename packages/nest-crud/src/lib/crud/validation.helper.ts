@@ -6,7 +6,7 @@ import { isNil } from 'lodash';
 
 import { CrudOptions, CrudValidationGroupsEnum } from '../interface/crud';
 import { isFalse } from '../utils';
-import { WhereOptions } from '@ackplus/nest-crud-request';
+import { WhereOptions } from '../types';
 
 /**
  * Helper function to generate documentation links
