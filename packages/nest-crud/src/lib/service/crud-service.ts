@@ -182,9 +182,11 @@ export class CrudService<T extends BaseEntity> {
             total: 0,
         }
 
+        const parsedOptions = RequestQueryParser.parse(filter || {});
+
         // Parse filter if it's a raw query parameter
         let queryBuilder = new FindQueryBuilder(this.repository);
-        let query = queryBuilder.build(filter);
+        let query = queryBuilder.build(parsedOptions);
         query = await this.beforeCounts(query);
 
         // No groupByKey: return total count

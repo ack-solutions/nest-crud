@@ -128,37 +128,52 @@ export class QueryBuilder {
         this.options[key] = value;
         return this;
     }
-
-    toObject() {
+    
+    toObject(constrainToNestedObject = false) {
         const options = {
             ...this.options,
         };
 
         // Convert where conditions to JSON string
         if (this.whereBuilder.hasConditions()) {
+            if (constrainToNestedObject) {
                 options.where = this.whereBuilder.toObject();
+            } else {
+                options.where = JSON.stringify(this.whereBuilder.toObject());
+            }
         } else {
             delete options.where;
         }
 
         // Convert relations to JSON string
         if (this.relationBuilder.hasRelations()) {
+            if (constrainToNestedObject) {
                 options.relations = this.relationBuilder.toObject();
-
+            } else {
+                options.relations = JSON.stringify(this.relationBuilder.toObject());
+            }
         } else {
             delete options.relations;
         }
 
         // Convert order to JSON string if it exists
         if (options.order && Object.keys(options.order).length > 0) {
-            options.order = options.order;
+            if (constrainToNestedObject) {
+                options.order = options.order;
+            } else {
+                options.order = JSON.stringify(options.order);
+            }
         } else {
             delete options.order;
         }
 
         // Convert select to JSON string if it exists
         if (options.select && options.select.length > 0) {
-            options.select = options.select;
+            if (constrainToNestedObject) {
+                options.select = options.select;
+            } else {
+                options.select = JSON.stringify(options.select);
+            }
         } else {
             delete options.select;
         }
@@ -167,7 +182,7 @@ export class QueryBuilder {
     }
 
     toJson() {
-        const obj = this.toObject();
+        const obj = this.toObject(true);
         return JSON.stringify(obj);
     }
 
