@@ -6,7 +6,7 @@ import type { DeepPartial } from 'typeorm';
 import { BaseEntity } from '../base-entity';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudOptions, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, PaginationResponse } from '../interface/crud';
+import { CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 
 
@@ -172,22 +172,20 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
-    async counts(request: {
-        filter: IFindManyOptions,
-        groupByKey?: string | string[],
-    }): Promise<{ total: number, data?: Array<{ count: number } & Record<string, any>> }> {
-        const { filter = {}, groupByKey = null } = request;
-
-        let result: { total: number, data?: Array<{ count: number } & Record<string, any>> } = {
-            total: 0,
-        }
-
-        const parsedOptions = RequestQueryParser.parse(filter || {});
+    async counts(request: ICountsRequest): Promise<ICountsResult> {
+        const groupByKey = request.groupByKey ?? null;
+        // make sure filter becomes a real object even if request has "filter[where]" keys
+        const rawFilter = RequestQueryParser.extractFilterFromRequest(request);
+        const parsedOptions = RequestQueryParser.parse(rawFilter || {});
 
         // Parse filter if it's a raw query parameter
         let queryBuilder = new FindQueryBuilder(this.repository);
         let query = queryBuilder.build(parsedOptions);
         query = await this.beforeCounts(query);
+
+        let result: ICountsResult = {
+            total: 0,
+        }
 
         // No groupByKey: return total count
         if (!groupByKey) {

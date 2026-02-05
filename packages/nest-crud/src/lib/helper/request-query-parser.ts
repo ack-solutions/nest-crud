@@ -66,6 +66,28 @@ export class RequestQueryParser {
         return { ...parsedQuery, ...options };
     }
 
+    static extractFilterFromRequest(request: Record<string, any>): Record<string, any> {
+        // If backend already gave filter as object, just return it
+        if (request.filter && typeof request.filter === 'object') return request.filter;
+
+        // Build an object only with keys that start with "filter"
+        const onlyFilterKeys: Record<string, any> = {};
+        for (const [k, v] of Object.entries(request)) {
+            if (k === 'filter' || k.startsWith('filter[') || k.startsWith('filter.')) {
+                onlyFilterKeys[k] = v;
+            }
+        }
+
+        // Convert: { 'filter[where]': '...', 'filter[take]': '50' } -> { filter: { where: '...', take: '50' } }
+        const parsed = qs.parse(onlyFilterKeys, {
+            depth: 10,
+            allowDots: true,
+            parseArrays: true,
+        });
+
+        return (parsed as any).filter ?? {};
+    }
+
     /**
      * Parse JSON values from query parameters
      */

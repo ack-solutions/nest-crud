@@ -91,6 +91,16 @@ export interface IFindOneOptions {
     [extraQueryParams: string]: any;
 }
 
+export interface ICountsRequest {
+    filter: IFindManyOptions;
+    groupByKey?: string | string[];
+    [extraQueryParams: string]: any;
+}
+
+export interface ICountsResult {
+    total: number;
+    data?: Array<{ count: number } & Record<string, any>>;
+}
 
 export interface IDeleteManyOptions {
     ids?: string[];
