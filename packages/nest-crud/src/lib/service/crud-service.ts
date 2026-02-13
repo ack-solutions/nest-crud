@@ -175,8 +175,7 @@ export class CrudService<T extends BaseEntity> {
     async counts(request: ICountsRequest): Promise<ICountsResult> {
         const groupByKey = request.groupByKey ?? null;
         // make sure filter becomes a real object even if request has "filter[where]" keys
-        const rawFilter = RequestQueryParser.extractFilterFromRequest(request);
-        const parsedOptions = RequestQueryParser.parse(rawFilter || {});
+        const parsedOptions = RequestQueryParser.parse(request?.filter || {});
 
         // Parse filter if it's a raw query parameter
         let queryBuilder = new FindQueryBuilder(this.repository);

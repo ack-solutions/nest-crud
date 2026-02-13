@@ -106,11 +106,24 @@ export class FindQueryBuilder<T extends ObjectLiteral> {
     }
 
     private buildOrder(order: Record<string, OrderDirectionEnum>) {
+        const quote = this.helper.getIdentifierQuote();
         // Don't call orderBy which overwrites everything, just use addOrderBy
         for (const key in order) {
-            let field = this.helper.getFieldWithAlias(key);
-            field = this.helper.cleanFieldName(field);
-            this.builder.addOrderBy(field, order[key]);
+            let orderByExpression: string;
+            const hasDot = key.includes('.');
+            if (hasDot) {
+                // Relation path (e.g. "profile.name") – use alias and preserve quotes for DB
+                orderByExpression = this.helper.getFieldWithAlias(key);
+            } else if (this.helper.entityColumns.includes(key)) {
+                // Known entity column – use "alias"."column" with quotes preserved
+                orderByExpression = this.helper.getFieldWithAlias(key);
+            } else {
+                // Virtual/computed alias (e.g. relation count "emailCount") – quote identifier only
+                // so PostgreSQL preserves case (SELECT ... AS "emailCount" requires ORDER BY "emailCount")
+                const unquoted = key.replace(new RegExp(quote, 'g'), '');
+                orderByExpression = `${quote}${unquoted}${quote}`;
+            }
+            this.builder.addOrderBy(orderByExpression, order[key]);
         }
     }
 
