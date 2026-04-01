@@ -1,7 +1,7 @@
-import { DataSource, EntityMetadata, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
-import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions, WhereObject } from '../types';
+import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import { RelationObject, RelationObjectValue, RelationOptions, WhereObject } from '../types';
 import { WhereQueryBuilder } from './where-query-builder';
-import { isArrayFull, normalizeColumnName } from '../utils';
+import { isArrayFull } from '../utils';
 import { QueryBuilderHelper } from './query-builder-helper';
 
 /**
@@ -32,11 +32,13 @@ import { QueryBuilderHelper } from './query-builder-helper';
 export class JoinQueryBuilder<T extends ObjectLiteral> {
 
     private builder: SelectQueryBuilder<T>;
+    private whereQueryBuilder: WhereQueryBuilder;
 
     constructor(
         private helper: QueryBuilderHelper<T>,
     ) {
         this.builder = this.helper.builder;
+        this.whereQueryBuilder = new WhereQueryBuilder(this.helper);
     }
 
     getBuilder() {
@@ -125,6 +127,10 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
             for (const field of select) {
                 this.helper.selectedFields.add(field);
             }
+
+            if (options.where) {
+                this.applyRelationWhere(name, options.where);
+            }
         } else {
             // Nested relation: profile.addresses, profile.addresses.country
             const relationName = segments[segments.length - 1]; // Last segment (addresses, country)
@@ -173,7 +179,54 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
                     this.helper.selectedFields.add(field);
                 }
             }
+
+            if (options.where) {
+                this.applyRelationWhere(name, options.where);
+            }
         }
+    }
+
+    /**
+     * Apply a relation-scoped where block.
+     *
+     * The where builder resolves aliases based on dot paths, so we prefix each column
+     * with the relation path:
+     * - relation "propertyUnits" + { tenantId: "..." } -> { "propertyUnits.tenantId": "..." }
+     * - relation "authUser.userAccesses" + { isActive: true } -> { "authUser.userAccesses.isActive": true }
+     */
+    private applyRelationWhere(relationPath: string, where: WhereObject | WhereObject[]) {
+        const prefixed = this.prefixWhereKeys(where, relationPath);
+        this.whereQueryBuilder.setParamsPrefix(`rel_${relationPath.replace(/\./g, '_')}_`);
+        this.whereQueryBuilder.build(prefixed);
+    }
+
+    private prefixWhereKeys(where: WhereObject | WhereObject[], relationPath: string): WhereObject | WhereObject[] {
+        if (Array.isArray(where)) {
+            return where.map((w) => this.prefixWhereKeys(w, relationPath) as WhereObject);
+        }
+
+        if (!where || typeof where !== 'object') {
+            return where;
+        }
+
+        const out: WhereObject = {};
+        for (const key of Object.keys(where)) {
+            const value = (where as any)[key];
+
+            // Logical operators keep their key, but recurse into their children
+            if (key === '$and' || key === '$or') {
+                out[key] = this.prefixWhereKeys(value, relationPath);
+                continue;
+            }
+
+            // Already-qualified (e.g. "authUser.email") - keep as-is
+            const nextKey = key.includes('.') ? key : `${relationPath}.${key}`;
+
+            // Recurse into operator objects like { $eq: ... } is handled by WhereQueryBuilder,
+            // so we only need to prefix the *field* key and keep value intact.
+            out[nextKey] = value;
+        }
+        return out;
     }
 
     /**
