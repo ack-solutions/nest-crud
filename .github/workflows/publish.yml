@@ -15,11 +15,11 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout main (full history)
+      - name: Checkout tag (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
+          ref: ${{ github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -50,10 +50,11 @@ jobs:
       - name: Ensure tag is from main HEAD
         shell: bash
         run: |
+          # Ensure the tag points to a commit that exists on origin/main.
           git fetch --tags origin
+          git fetch origin main
           TAG_COMMIT="$(git rev-list -n 1 "$GITHUB_REF")"
-          MAIN_COMMIT="$(git rev-parse origin/main)"
-          [ "$TAG_COMMIT" = "$MAIN_COMMIT" ]
+          git merge-base --is-ancestor "$TAG_COMMIT" "origin/main"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -62,18 +63,6 @@ jobs:
         shell: bash
         run: |
           pnpm -r exec npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
-
-      - name: Commit & push version changes
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if ! git diff --quiet; then
-            git add -A
-            git commit -m "chore(release): v${{ steps.version.outputs.version }}"
-            git push origin main
-          fi
 
       - name: Build packages
         run: pnpm build
