@@ -33,6 +33,12 @@ export interface CrudOptions {
     path?: string;
     select?: string[];
     hiddenFields?: string[];
+    /**
+     * Maximum allowed `take` / `limit` per request for list queries (findMany and counts filter).
+     * When omitted, uses `CrudConfigService.config.maxPageSize` or 5000.
+     */
+    maxPerPage?: number;
+    maxPageSize?: number;
     query?: CrudQueryOptions;
     entity: any;
     routes?: Partial<CrudRoutesOptions>;
@@ -49,12 +55,17 @@ export interface PaginationResponse<T> {
     total: number;
 }
 
+export type ListResponse<T> = PaginationResponse<T>;
+
+export type FindAllResponse<T> = T[];
+
 export enum CrudValidationGroupsEnum {
     CREATE = 'create',
     UPDATE = 'update',
 }
 
 export enum CrudActionsEnum {
+    FIND_ALL = 'findAll',
     FIND_MANY = 'findMany',
     COUNTS = 'counts',
     FIND_ONE = 'findOne',

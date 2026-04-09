@@ -125,6 +125,7 @@ export class Swagger {
 
     static operationsMap(modelName: string): { [key in CrudActionsEnum]: string } {
         return {
+            [CrudActionsEnum.FIND_ALL]: `Retrieve all ${pluralize(modelName)} (no pagination)`,
             [CrudActionsEnum.FIND_MANY]: `Retrieve multiple ${pluralize(modelName)}`,
             [CrudActionsEnum.FIND_ONE]: `Retrieve a single ${modelName}`,
             [CrudActionsEnum.COUNTS]: `Retrieve counts of ${pluralize(modelName)}`,
@@ -385,6 +386,26 @@ export class Swagger {
                             description: 'Successfully retrieved the item',
                             schema: isValidEntityType ? entitySchema : undefined,
                             type: isValidEntityType ? entityType : undefined,
+                        },
+                    };
+                    break;
+
+                case CrudActionsEnum.FIND_ALL:
+                    // findAll returns T[] (array of entities) without pagination metadata
+                    successResponse = {
+                        [HttpStatus.OK]: {
+                            description: 'Successfully retrieved items (no pagination)',
+                            schema: isValidEntityType
+                                ? {
+                                    type: 'array',
+                                    items: entitySchema,
+                                    description: 'Array of items matching the query',
+                                }
+                                : {
+                                    type: 'array',
+                                    items: { type: 'object' },
+                                    description: 'Array of items matching the query',
+                                },
                         },
                     };
                     break;

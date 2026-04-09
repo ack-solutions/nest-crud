@@ -1,13 +1,23 @@
 import deepmerge from 'deepmerge';
 
-import { CrudActionsEnum, CrudOptions } from '../interface/crud';
+import { CrudOptions } from '../interface/crud';
 import { RequestMethod } from '@nestjs/common';
+
+import { DEFAULT_MAX_PER_PAGE } from '../constants';
 
 
 export class CrudConfigService {
 
     static config: Partial<CrudOptions> = {
+        maxPageSize: DEFAULT_MAX_PER_PAGE,
         routes: {
+            findAll: {
+                path: '/get/all',
+                method: RequestMethod.GET,
+                enabled: true,
+                interceptors: [],
+                decorators: [],
+            },
             findMany: {
                 path: '/',
                 method: RequestMethod.GET,

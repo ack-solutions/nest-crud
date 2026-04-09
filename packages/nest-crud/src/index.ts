@@ -14,4 +14,5 @@ export * from './lib/helper/request-query-parser';
 // Base Entity
 export * from './lib/base-entity';
 export * from './lib/constants';
+export * from './lib/helper/pagination-limit';
 export * from './lib/utils-helper';

@@ -5,8 +5,9 @@ import type { DeepPartial } from 'typeorm';
 
 import { BaseEntity } from '../base-entity';
 import { FindQueryBuilder } from '../helper/find-query-builder';
+import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, PaginationResponse } from '../interface/crud';
+import { CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 
 
@@ -16,91 +17,279 @@ export class CrudService<T extends BaseEntity> {
 
     constructor(readonly repository: Repository<T>) { }
 
+    /**
+     * Hook that runs before `create()` and `update()` persist data.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     *
+     * @param entity Partial entity payload that will be saved.
+     * @param _request Optional original request context (controller can pass anything).
+     * @returns The final entity payload that will be passed into TypeORM save/update.
+     */
     protected async beforeSave(entity: Partial<T>, _request?: any): Promise<Partial<T>> {
         return entity;
     }
+
+    /**
+     * Hook that runs after `save()` and `update()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     *
+     * @param newValue The newly saved entity (reloaded from DB).
+     * @param _oldValue The previous entity state (before save).
+     * @param _request The original request context.
+     * @returns The final entity to return to the client.
+     */
     protected async afterSave(newValue: T, _oldValue?: any, _request?: any): Promise<T> {
         return newValue;
     }
 
+    /**
+     * Hook that runs before `create()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeCreate(entity: Partial<T>, _request?: any) {
         return entity;
     }
 
+    /**
+     * Hook that runs after `create()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterCreate(newValue: T, _oldValue?: any, _request?: any) {
         return newValue;
     }
 
+    /**
+     * Hook that runs before `update()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeUpdate(entity: Partial<T>, _entityData?: T) {
         return entity;
     }
 
+    /**
+     * Hook that runs after `update()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterUpdate(newValue: T, _oldValue?: any, _request?: any) {
         return newValue;
     }
 
 
+    /**
+     * Hook that runs before executing list queries (`findMany()` and `findAll()`).
+     *
+     * Use this to:
+     * - Add additional `andWhere` constraints (tenant scoping, RBAC, etc.)
+     * - Force joins/relations
+     * - Add default ordering when client didn’t specify one
+     *
+     * @param queryBuilder The TypeORM query builder produced by `FindQueryBuilder`.
+     * @param _orgRequest The original request query object (raw query params).
+     * @returns The query builder to execute (can be the same instance).
+     */
     protected async beforeFindMany(queryBuilder: SelectQueryBuilder<T>, _orgRequest?: any): Promise<SelectQueryBuilder<T>> {
         return queryBuilder;
     }
 
+    /**
+     * Hook that runs before executing `counts()`.
+     *
+     * @param queryBuilder The TypeORM query builder produced by `FindQueryBuilder`.
+     * @param _orgRequest The original request context.
+     * @returns The query builder to execute.
+     */
     protected async beforeCounts(queryBuilder: SelectQueryBuilder<T>, _orgRequest?: any): Promise<SelectQueryBuilder<T>> {
         return queryBuilder;
     }
-
+    /**
+     * Hook that runs before executing `findOne()`.
+     *
+     * @param queryBuilder The TypeORM query builder produced by `FindQueryBuilder`.
+     * @param _orgRequest The original request context.
+     * @returns The query builder to execute.
+     */
     protected async beforeFindOne(queryBuilder: SelectQueryBuilder<T>, _orgRequest?: any): Promise<SelectQueryBuilder<T>> {
         return queryBuilder;
     }
 
-
+    /**
+     * Hook that runs before `delete()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeDelete(data: T) {
         return data;
     }
 
+    /**
+     * Hook that runs after `delete()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterDelete(oldData: T) {
         return oldData;
     }
 
+    /**
+     * Hook that runs before `deleteMany()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeDeleteMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Hook that runs after `deleteMany()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterDeleteMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Hook that runs before `deleteFromTrash()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeDeleteFromTrash(data: T) {
         return data;
     }
 
+    /**
+     * Hook that runs after `deleteFromTrash()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterDeleteFromTrash(oldData: T) {
         return oldData;
     }
 
+    /**
+     * Hook that runs before `deleteFromTrashMany()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeDeleteFromTrashMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Hook that runs after `deleteFromTrashMany()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterDeleteFromTrashMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Hook that runs before `restore()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeRestore(data: T) {
         return data;
     }
 
+    /**
+     * Hook that runs after `restore()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterRestore(oldData: T) {
         return oldData;
     }
 
+    /**
+     * Hook that runs before `restoreMany()`.
+     *
+     * Use this to:
+     * - Normalize/transform incoming fields (e.g. trim strings)
+     * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
+     * - Remove/override unsafe values before saving
+     */
     protected async beforeRestoreMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Hook that runs after `restoreMany()`.
+     *
+     * Use this to:
+     * - Add additional post-save logic (e.g. logging, notifications)
+     * - Trigger related actions (e.g. indexing, cache invalidation)
+     * - Validate the saved entity (e.g. check for required fields)
+     */
     protected async afterRestoreMany(ids: ID[]) {
         return ids;
     }
 
+    /**
+     * Create a single record.
+     *
+     * - Input: partial entity payload (only valid columns/relations are persisted)
+     * - Output: the newly created entity (reloaded from DB)
+     *
+     * Hooks:
+     * - `beforeSave()` then `beforeCreate()` run before persistence
+     * - `afterSave()` then `afterCreate()` run after persistence
+     */
     async create(data: Partial<T>, saveOptions: SaveOptions = {}): Promise<T> {
         if (!data || Object.keys(data).length === 0) {
             throw new Error('No data provided for insert.');
@@ -129,6 +318,16 @@ export class CrudService<T extends BaseEntity> {
         return createdEntity;
     }
 
+    /**
+     * Create multiple records in a transaction.
+     *
+     * - Input: `{ bulk: Partial<T>[] }`
+     * - Output: array of created entities
+     *
+     * Hooks:
+     * - For each item: `beforeSave()` + `beforeCreate()` before persistence
+     * - For each saved item: `afterSave()` + `afterCreate()` after persistence
+     */
     async createMany(
         data: { bulk: Partial<T>[] },
         saveOptions: SaveOptions = {},
@@ -156,9 +355,26 @@ export class CrudService<T extends BaseEntity> {
         });
     }
 
-    async findMany(query: IFindManyOptions, ..._others: any[]): Promise<PaginationResponse<T>> {
-        // Parse raw query parameters into structured options
+    async findMany(query: IFindManyOptions, crudOptions?: Partial<CrudOptions>, ..._others: any[]): Promise<PaginationResponse<T>> {
+        /**
+         * List endpoint WITH pagination metadata.
+         *
+         * Query parameters (same for `findMany` and `findAll`):
+         * - `where`: JSON string or nested object. Supports operators like `$eq`, `$in`, `$like`, `$and`, `$or`, etc.
+         * - `relations`: JSON string/object to join relations (and optional relation-level where/select).
+         * - `order`: JSON string/object like `{ "createdAt": "DESC" }`
+         * - `select`: JSON string/array of columns to select
+         * - Soft delete flags: `withDeleted=true` or `onlyDeleted=true`
+         *
+         * Pagination parameters:
+         * - `take` / `limit`: page size (server enforces `maxPerPage`)
+         * - `skip` / `offset`: starting index
+         *
+         * Response:
+         * - `{ items: T[]; total: number }`
+         */
         const parsedOptions = RequestQueryParser.parse(query || {});
+        applyListPagination(parsedOptions, crudOptions);
 
         let queryBuilder = new FindQueryBuilder(this.repository);
 
@@ -172,10 +388,44 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
-    async counts(request: ICountsRequest): Promise<ICountsResult> {
+    /**
+  * List endpoint WITHOUT pagination metadata.
+  *
+  * - Uses the same filtering/sorting/relations/select parameters as `findMany()`
+  * - Ignores any `skip/offset` so clients can’t page through results here
+  * - Still enforces `maxPerPage` as a hard cap to prevent unbounded queries
+  *
+  * Response:
+  * - `T[]` (only data, no `total`)
+  */
+    async findAll(query: IFindManyOptions, crudOptions?: Partial<CrudOptions>, ..._others: any[]): Promise<FindAllResponse<T>> {
+        const parsedOptions = RequestQueryParser.parse(query || {});
+        applyNoPaginationLimit(parsedOptions, crudOptions);
+
+        let queryBuilder = new FindQueryBuilder(this.repository);
+
+        let builder = queryBuilder.build(parsedOptions);
+        builder = await this.beforeFindMany(builder, query);
+        return builder.getMany();
+    }
+
+    /**
+     * Return counts for the given filter.
+     *
+     * - Input: `{ filter: <same query shape as findMany/findAll>, groupByKey?: string|string[] }`
+     * - Output:
+     *   - Without `groupByKey`: `{ total: number }`
+     *   - With `groupByKey`: `{ total: number; data: Array<{ count: number } & Record<string, any>> }`
+     *
+     * Notes:
+     * - Pagination fields are removed from the filter so the count isn't page-limited.
+     * - `maxPerPage` is still enforced if the client tries to pass `take/limit` above the max.
+     */
+    async counts(request: ICountsRequest, crudOptions?: Partial<CrudOptions>): Promise<ICountsResult> {
         const groupByKey = request.groupByKey ?? null;
         // make sure filter becomes a real object even if request has "filter[where]" keys
         const parsedOptions = RequestQueryParser.parse(request?.filter || {});
+        sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter
         let queryBuilder = new FindQueryBuilder(this.repository);
@@ -222,6 +472,18 @@ export class CrudService<T extends BaseEntity> {
         return result;
     }
 
+    /**
+     * Find one record by `id`.
+     *
+     * - Input:
+     *   - `id`: primary identifier
+     *   - `query`: same join/select options as list endpoints (relations/select/where)
+     * - Output: entity `T`
+     *
+     * Notes:
+     * - `id` is always enforced via `where: { id: { $eq: id } }` (merged with extra `where`).
+     * - Throws `NotFoundException` when nothing matches.
+     */
     async findOne(id: ID, query: IFindOneOptions = {}, ..._others: any[]): Promise<T> {
         // Parse query parameters for joins
         const parsedOptions = RequestQueryParser.parse(query || {});
@@ -247,6 +509,20 @@ export class CrudService<T extends BaseEntity> {
         return results;
     }
 
+    /**
+     * Update a single record by id or where-criteria.
+     *
+     * - Input:
+     *   - `criteria`: `id` (string/number) or `FindOptionsWhere<T>`
+     *   - `data`: partial entity payload
+     * - Output: updated entity `T` (reloaded from DB)
+     *
+     * Hooks:
+     * - `beforeSave()` then `beforeUpdate()` run before persistence
+     * - `afterSave()` then `afterUpdate()` run after persistence
+     *
+     * Throws `NotFoundException` if record doesn't exist.
+     */
     async update(criteria: ID | FindOptionsWhere<T>, data: Partial<T>, ..._others: any[]) {
         criteria = this.parseFindOptions(criteria);
         const oldData = await this.repository.findOne({ where: criteria });
@@ -268,6 +544,17 @@ export class CrudService<T extends BaseEntity> {
         return result;
     }
 
+    /**
+     * Update multiple records in a transaction.
+     *
+     * - Input: `{ bulk: Array<Partial<T> & { id: ID }> }`
+     * - Output: array of updated entities (only those found + updated)
+     *
+     * Notes:
+     * - Items without `id` are skipped.
+     * - Missing records are skipped (no error).
+     * - Hooks `beforeSave/beforeUpdate` and `afterSave/afterUpdate` run per item.
+     */
     async updateMany(
         data: { bulk: (Partial<T> & { id: ID })[] },
         ..._others: any[]
@@ -310,6 +597,15 @@ export class CrudService<T extends BaseEntity> {
         });
     }
 
+    /**
+     * Delete a single record by id or where-criteria.
+     *
+     * - If `softDelete` is true: uses TypeORM `softDelete`
+     * - Else: uses TypeORM `delete` (hard delete)
+     *
+     * Output: `{ message: string }`
+     * Throws `NotFoundException` if record doesn't exist.
+     */
     async delete(criteria: ID | FindOptionsWhere<T>, softDelete?: boolean, ..._others: any) {
         criteria = this.parseFindOptions(criteria);
 
@@ -332,6 +628,15 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Delete multiple records by ids.
+     *
+     * - Input: `{ ids: string[] }`
+     * - Behavior:
+     *   - If `softDelete` is true: soft-deletes by ids
+     *   - Else: hard-deletes by ids
+     * - Output: `{ message: string }`
+     */
     async deleteMany(params: IDeleteManyOptions, softDelete?: boolean, ..._others: any) {
         if (!params.ids || params.ids.length === 0) {
             return {
@@ -355,6 +660,15 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Permanently delete a single record from trash (soft-delete enabled mode).
+     *
+     * - Input: `id` or where-criteria
+     * - Output: `{ success: true, message: string }`
+     *
+     * Notes:
+     * - Reads with `withDeleted: true` so it can target soft-deleted rows.
+     */
     async deleteFromTrash(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
         criteria = this.parseFindOptions(criteria);
 
@@ -377,6 +691,12 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Permanently delete multiple records from trash (soft-delete enabled mode).
+     *
+     * - Input: `{ ids: string[] }`
+     * - Output: `{ success: true, message: string }`
+     */
     async deleteFromTrashMany(params: IDeleteManyOptions, ..._others: any[]) {
         if (!params.ids || params.ids.length === 0) {
             return {
@@ -395,6 +715,15 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Restore a single soft-deleted record.
+     *
+     * - Input: `id` or where-criteria
+     * - Output: `{ success: true, message: string }`
+     *
+     * Notes:
+     * - Reads with `withDeleted: true` so it can restore soft-deleted rows.
+     */
     async restore(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
         criteria = this.parseFindOptions(criteria);
 
@@ -417,6 +746,12 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Restore multiple soft-deleted records.
+     *
+     * - Input: `{ ids: ID[] }`
+     * - Output: `{ success: true, message: string }`
+     */
     async restoreMany(params: { ids: ID[] }, ..._others: any[]) {
         const ids = await this.beforeRestoreMany(params.ids);
         if (ids?.length > 0) {
@@ -431,12 +766,28 @@ export class CrudService<T extends BaseEntity> {
         };
     }
 
+    /**
+     * Reorder records by updating their `order` field.
+     *
+     * - Input: ordered array of ids
+     * - Output: void
+     *
+     * Notes:
+     * - Expects the entity to have an `order` column.
+     * - Writes \(N\) updates (one per id).
+     */
     async reorder(order: ID[], ..._others: any[]) {
         for (let i = 0; i < order.length; i++) {
             await this.repository.update(order[i], { order: i } as any);
         }
     }
 
+    /**
+     * Normalize "criteria" input into a TypeORM `FindOptionsWhere<T>`.
+     *
+     * - If criteria is `string|number`, it becomes `{ id: criteria }`
+     * - If it's already an object, it's returned as-is
+     */
     protected parseFindOptions(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
         if (typeof criteria === 'string' || typeof criteria === 'number') {
             criteria = { id: criteria } as any;

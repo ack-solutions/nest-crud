@@ -67,3 +67,6 @@ export interface QueryBuilderOptions {
     withDeleted?: boolean;
     onlyDeleted?: boolean;
 }
+
+export type FindManyResponse<T> = { items: T[]; total: number };
+export type FindAllResponse<T> = T[];

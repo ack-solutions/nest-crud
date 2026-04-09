@@ -13,6 +13,7 @@ import { Validation } from './validation.helper';
 import { CrudActionsEnum, CrudOptions, CrudRoutesOptions, CrudValidationGroupsEnum, RouteOptionsWithName } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 import { CrudConfigService } from '../service/crud-config.service';
+import { resolveMaxPerPage } from '../helper/pagination-limit';
 
 /**
  * Factory class responsible for creating and configuring CRUD routes dynamically.
@@ -141,6 +142,9 @@ export class CrudRoutesFactory {
             this.options.dto = {};
         }
 
+        // Server-only pagination (per-controller or global defaults)
+        this.options.maxPerPage = resolveMaxPerPage(this.options);
+
         // Store merged options in reflection metadata
         R.setCrudOptions(this.options, this.target);
     }
@@ -157,7 +161,18 @@ export class CrudRoutesFactory {
     protected findManyHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function findMany(req: any) {
             checkService(this);
-            return this.service.findMany(req);
+            return this.service.findMany(req, R.getCrudOptions(this.constructor));
+        };
+    }
+
+    /**
+     * Creates handler for retrieving items without pagination metadata.
+     * Still enforces server-side maxPerPage as a hard cap.
+     */
+    protected findAllHandler(name: CrudActionsEnum) {
+        this.targetProto[name] = function findAll(req: any) {
+            checkService(this);
+            return this.service.findAll(req, R.getCrudOptions(this.constructor));
         };
     }
 
@@ -168,7 +183,7 @@ export class CrudRoutesFactory {
     protected countsHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function counts(req: any) {
             checkService(this);
-            return this.service.counts(req);
+            return this.service.counts(req, R.getCrudOptions(this.constructor));
         };
     }
 
@@ -414,7 +429,7 @@ export class CrudRoutesFactory {
      *   // Override findMany - all metadata will be automatically applied
      *   async findMany(@Query() query: any) {
      *     // Custom logic here
-     *     return this.service.findMany(query);
+     *     return this.service.findMany(query, R.getCrudOptions(this.constructor));
      *   }
      * }
      * ```
@@ -554,6 +569,7 @@ export class CrudRoutesFactory {
         let args = {};
 
         switch (name) {
+            case 'findAll':
             case 'findMany':
             case 'counts':
                 // Query parameters for filtering, sorting, pagination
@@ -647,6 +663,11 @@ export class CrudRoutesFactory {
      */
     protected setRouteArgsTypes(name: CrudActionsEnum) {
         switch (name) {
+            case 'findAll': {
+                const findManyDto = Validation.createFindManyDto(this.options);
+                R.setRouteArgsTypes([findManyDto], this.targetProto, name);
+                break;
+            }
             case 'findMany': {
                 const findManyDto = Validation.createFindManyDto(this.options);
                 R.setRouteArgsTypes([findManyDto], this.targetProto, name);

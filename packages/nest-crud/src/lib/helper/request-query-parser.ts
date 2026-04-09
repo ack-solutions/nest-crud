@@ -28,6 +28,7 @@ export class RequestQueryParser {
             delete parsedQuery.limit;
         } else if (parsedQuery.take !== undefined) {
             options.take = this.parseInteger(parsedQuery.take);
+            delete parsedQuery.take;
         }
 
         if (parsedQuery.offset !== undefined) {
@@ -35,6 +36,7 @@ export class RequestQueryParser {
             delete parsedQuery.offset;
         } else if (parsedQuery.skip !== undefined) {
             options.skip = this.parseInteger(parsedQuery.skip);
+            delete parsedQuery.skip;
         }
 
         // Handle soft delete options
