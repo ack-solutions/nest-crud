@@ -1,48 +1,77 @@
 # @ackplus/nest-crud
 
-Powerful CRUD operations for NestJS with TypeORM - automatic REST endpoints, advanced filtering, relations, pagination, and more.
+`@ackplus/nest-crud` generates CRUD routes for NestJS + TypeORM. It gives you a `@Crud()` decorator, a reusable `CrudService<T>`, request-query parsing, Swagger metadata, and helpers for custom query reuse.
 
-## Features
+## What It Does
 
-- 🚀 **Automatic CRUD endpoints** - Generate complete REST APIs with a single decorator
-- 🔍 **Advanced filtering** - Support for complex where conditions with multiple operators
-- 🔗 **Relations handling** - Automatically load and filter related entities
-- 📄 **Pagination** - Built-in pagination with skip/take support
-- 🎯 **Field selection** - Select specific fields to return
-- 📚 **Swagger integration** - Automatic API documentation
-- 🛡️ **Validation** - Built-in request validation with class-validator
-- 🔧 **Customizable** - Override default behavior with hooks and custom logic
-- 🐛 **Debug mode** - Step-by-step query builder logs
+Use this package when you want:
+
+- fast CRUD setup for a TypeORM entity
+- one request format for filters, relations, select, sorting, and pagination
+- service hooks instead of rewriting CRUD logic
+- custom endpoints beside generated CRUD routes
 
 ## Installation
 
 ```bash
 npm install @ackplus/nest-crud
-# or
-pnpm add @ackplus/nest-crud
-# or
-yarn add @ackplus/nest-crud
+npm install @nestjs/common @nestjs/core @nestjs/platform-express @nestjs/swagger @nestjs/typeorm typeorm class-validator class-transformer reflect-metadata
 ```
 
-## Peer Dependencies
+Declared peer ranges:
+
+- `@nestjs/common`: `^10 || ^11`
+- `@nestjs/core`: `^10 || ^11`
+- `@nestjs/platform-express`: `^10 || ^11`
+- `@nestjs/swagger`: `^10 || ^11`
+- `@nestjs/typeorm`: `^10 || ^11`
+- `typeorm`: `^0.3.21`
+
+## Optional Companion Package For Requests
+
+If you do not want to build request query params manually, this repo also provides:
 
 ```bash
-npm install @nestjs/common @nestjs/core @nestjs/typeorm typeorm class-validator class-transformer reflect-metadata
+npm install @ackplus/nest-crud-request
 ```
+
+That package helps build:
+
+- `where`
+- `relations`
+- `select`
+- `order`
+- `take`
+- `skip`
+- `withDeleted`
+- `onlyDeleted`
+
+Example:
+
+```ts
+import { QueryBuilder, WhereOperatorEnum, OrderDirectionEnum } from '@ackplus/nest-crud-request';
+
+const params = new QueryBuilder()
+  .where('isActive', WhereOperatorEnum.EQ, true)
+  .addRelation('posts', ['id', 'title'])
+  .addOrder('createdAt', OrderDirectionEnum.DESC)
+  .setTake(10)
+  .setSkip(0)
+  .toObject();
+```
+
+See [`../nest-crud-request/README.md`](../nest-crud-request/README.md) for the full request-builder documentation.
 
 ## Quick Start
 
-### 1. Create your entity
-
-```typescript
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { Post } from './post.entity';
+```ts
+import { Module, Injectable } from '@nestjs/common';
+import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
+import { Entity, Column, Repository } from 'typeorm';
+import { BaseEntity, Crud, CrudService } from '@ackplus/nest-crud';
 
 @Entity('users')
-export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class User extends BaseEntity {
   @Column({ unique: true })
   email: string;
 
@@ -51,67 +80,31 @@ export class User {
 
   @Column()
   lastName: string;
-
-  @Column({ default: true })
-  isActive: boolean;
-
-  @OneToMany(() => Post, (post) => post.author)
-  posts: Post[];
 }
-```
-
-### 2. Create a CRUD controller
-
-```typescript
-import { Controller } from '@nestjs/common';
-import { Crud } from '@ackplus/nest-crud';
-import { User } from './user.entity';
-import { UserService } from './user.service';
-
-@Crud({
-  entity: User,
-  routes: {
-    findAll: true,
-    findOne: true,
-    create: true,
-    update: true,
-    delete: true,
-  },
-})
-@Controller('users')
-export class UserController {
-  constructor(public service: UserService) {}
-}
-```
-
-### 3. Create a CRUD service
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CrudService } from '@ackplus/nest-crud';
-import { User } from './user.entity';
 
 @Injectable()
 export class UserService extends CrudService<User> {
   constructor(
-    @InjectRepository(User)
-    protected repository: Repository<User>,
+    @InjectRepository(User) public repository: Repository<User>,
   ) {
     super(repository);
   }
 }
-```
 
-### 4. Register in your module
-
-```typescript
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { UserController } from './user.controller';
-import { UserService } from './user.service';
-import { User } from './user.entity';
+@Crud({
+  path: 'users',
+  entity: User,
+  routes: {
+    findMany: { enabled: true },
+    findOne: { enabled: true },
+    create: { enabled: true },
+    update: { enabled: true },
+    delete: { enabled: true },
+  },
+})
+export class UserController {
+  constructor(public service: UserService) {}
+}
 
 @Module({
   imports: [TypeOrmModule.forFeature([User])],
@@ -121,388 +114,453 @@ import { User } from './user.entity';
 export class UserModule {}
 ```
 
-That's it! Your API is ready with the following endpoints:
+Generated endpoints:
 
-- `GET /users` - Get all users with filtering, pagination, relations
-- `GET /users/:id` - Get a single user
-- `POST /users` - Create a new user
-- `PATCH /users/:id` - Update a user
-- `DELETE /users/:id` - Delete a user
+- `GET /users` -> `{ items, total }`
+- `GET /users/:id`
+- `POST /users`
+- `PUT /users/:id`
+- `DELETE /users/:id`
 
-## API Usage Examples
+## Main Concepts
 
-### Basic Queries
+## `@Crud()`
+
+`@Crud()` is the controller decorator for this package. It:
+
+- applies `@Controller(...)`
+- generates route handlers when they do not exist
+- applies Swagger metadata
+- applies validation metadata
+- attaches route-level guards, interceptors, and custom decorators
+
+Recommended pattern:
+
+```ts
+@Crud({
+  path: 'users',
+  entity: User,
+  routes: {
+    findMany: { enabled: true },
+  },
+})
+```
+
+Use `path` inside `@Crud()`. Do not stack a separate `@Controller()` unless you want to override the path yourself.
+
+## `CrudService<T>`
+
+`CrudService<T>` is the runtime implementation behind generated routes. Extend it in your service and pass the TypeORM repository into `super(repository)`.
+
+Main methods:
+
+| Method | Purpose |
+| --- | --- |
+| `findMany(query, crudOptions?)` | paginated list, returns `{ items, total }` |
+| `findAll(query, crudOptions?)` | plain array list, returns `T[]` |
+| `counts(request, crudOptions?)` | count or grouped count |
+| `findOne(id, query?)` | fetch one entity |
+| `create(data)` | create one entity |
+| `createMany({ bulk })` | create many entities |
+| `update(idOrWhere, data)` | update one entity |
+| `updateMany({ bulk })` | update many entities |
+| `delete(idOrWhere, softDelete?)` | hard or soft delete one |
+| `deleteMany({ ids }, softDelete?)` | hard or soft delete many |
+| `restore(idOrWhere)` | restore one soft-deleted record |
+| `restoreMany({ ids })` | restore many soft-deleted records |
+| `deleteFromTrash(idOrWhere)` | hard delete one trashed record |
+| `deleteFromTrashMany({ ids })` | hard delete many trashed records |
+| `reorder(ids)` | update an `order` column using array order |
+
+## Generated Routes
+
+These are the default route definitions from the package:
+
+| Action | Method | Default path |
+| --- | --- | --- |
+| `findAll` | `GET` | `/get/all` |
+| `findMany` | `GET` | `/` |
+| `counts` | `GET` | `/get/counts` |
+| `findOne` | `GET` | `/:id` |
+| `create` | `POST` | `/` |
+| `createMany` | `POST` | `/bulk` |
+| `update` | `PUT` | `/:id` |
+| `updateMany` | `PUT` | `/bulk` |
+| `delete` | `DELETE` | `/:id` |
+| `deleteMany` | `DELETE` | `/delete/bulk` |
+| `deleteFromTrash` | `DELETE` | `/:id/trash` |
+| `deleteFromTrashMany` | `DELETE` | `/trash/bulk` |
+| `restore` | `PUT` | `/:id/restore` |
+| `restoreMany` | `PUT` | `/restore/bulk` |
+| `reorder` | `PUT` | `/reorder` |
+
+Soft-delete restore and trash routes are only created when `softDelete: true` is enabled.
+
+## Route Configuration
+
+Each route supports:
+
+- `enabled`
+- `path`
+- `method`
+- `guards`
+- `interceptors`
+- `decorators`
+
+Recommended form:
+
+```ts
+routes: {
+  findMany: {
+    enabled: true,
+    guards: [AuthGuard],
+  },
+  createMany: {
+    enabled: false,
+  },
+}
+```
+
+Use explicit route objects. The exported types allow boolean flags, but the runtime merge logic is safest with object configs.
+
+## Request Query Format
+
+The backend parser accepts these top-level query parameters:
+
+- `where`
+- `relations`
+- `select`
+- `order`
+- `skip` or `offset`
+- `take` or `limit`
+- `withDeleted`
+- `onlyDeleted`
+
+Example:
+
+```http
+GET /users?where={"isActive":{"$eq":true}}&relations={"posts":{"select":["id","title"]}}&order={"createdAt":"DESC"}&take=10&skip=0
+```
+
+Supported formats:
+
+- JSON strings
+- nested objects
+- bracket notation such as `where[status][$eq]=active`
+
+## How To Send Requests Without `@ackplus/nest-crud-request`
+
+You can call the API directly without the request-builder package.
+
+The common rule is:
+
+- send `where`, `relations`, `select`, and `order` as JSON strings
+- send `take`, `skip`, `limit`, `offset`, `withDeleted`, and `onlyDeleted` as normal query params
+
+### Direct URL Example
+
+```http
+GET /users?where={"isActive":{"$eq":true}}&relations={"posts":{"select":["id","title"]}}&select=["id","email","firstName"]&order={"createdAt":"DESC"}&take=10&skip=0
+```
+
+### `fetch` Example
+
+```ts
+const params = new URLSearchParams({
+  where: JSON.stringify({
+    isActive: { $eq: true },
+  }),
+  relations: JSON.stringify({
+    posts: {
+      select: ['id', 'title'],
+    },
+  }),
+  select: JSON.stringify(['id', 'email', 'firstName']),
+  order: JSON.stringify({
+    createdAt: 'DESC',
+  }),
+  take: '10',
+  skip: '0',
+});
+
+const response = await fetch(`/users?${params.toString()}`);
+const data = await response.json();
+```
+
+### `axios` Example
+
+```ts
+const response = await axios.get('/users', {
+  params: {
+    where: JSON.stringify({
+      role: { $in: ['admin', 'moderator'] },
+    }),
+    order: JSON.stringify({
+      createdAt: 'DESC',
+    }),
+    take: 20,
+    skip: 0,
+  },
+});
+```
+
+### `curl` Example
 
 ```bash
-# Get all users
-GET /users
+curl -G http://localhost:3000/users \
+  --data-urlencode 'where={"isActive":{"$eq":true}}' \
+  --data-urlencode 'relations={"posts":{"select":["id","title"]}}' \
+  --data-urlencode 'order={"createdAt":"DESC"}' \
+  --data-urlencode 'take=10' \
+  --data-urlencode 'skip=0'
+```
 
-# Get a specific user
-GET /users/1
+### Bracket-Notation Example
 
-# Create a user
+This also works if your client or API tool prefers nested query params instead of JSON strings:
+
+```http
+GET /users?where[isActive][$eq]=true&order[createdAt]=DESC&take=10&skip=0
+```
+
+### Request Body Examples
+
+Create:
+
+```http
 POST /users
+Content-Type: application/json
+
 {
   "email": "john@example.com",
   "firstName": "John",
   "lastName": "Doe"
 }
+```
 
-# Update a user
-PATCH /users/1
+Update:
+
+```http
+PUT /users/123
+Content-Type: application/json
+
 {
   "firstName": "Jane"
 }
-
-# Delete a user
-DELETE /users/1
 ```
 
-### Advanced Filtering
+Bulk create:
 
-The query parameters are parsed from the URL and support complex filtering:
+```http
+POST /users/bulk
+Content-Type: application/json
 
-```bash
-# Filter by equality
-GET /users?where={"email":{"$eq":"john@example.com"}}
-
-# Filter by multiple conditions
-GET /users?where={"isActive":{"$eq":true},"role":{"$eq":"admin"}}
-
-# Greater than / Less than
-GET /users?where={"age":{"$gt":18}}
-GET /users?where={"age":{"$gte":18}}
-GET /users?where={"age":{"$lt":65}}
-GET /users?where={"age":{"$lte":65}}
-
-# IN operator
-GET /users?where={"role":{"$in":["admin","moderator"]}}
-
-# NOT IN operator
-GET /users?where={"role":{"$notIn":["banned","suspended"]}}
-
-# LIKE operator (case-sensitive)
-GET /users?where={"email":{"$like":"%@example.com"}}
-
-# ILIKE operator (case-insensitive)
-GET /users?where={"firstName":{"$iLike":"%john%"}}
-
-# IS NULL / IS NOT NULL
-GET /users?where={"deletedAt":{"$isNull":true}}
-GET /users?where={"deletedAt":{"$isNotNull":true}}
-
-# BETWEEN
-GET /users?where={"age":{"$between":[18,65]}}
-
-# Logical operators - AND
-GET /users?where={"$and":[{"isActive":{"$eq":true}},{"role":{"$eq":"admin"}}]}
-
-# Logical operators - OR
-GET /users?where={"$or":[{"role":{"$eq":"admin"}},{"role":{"$eq":"moderator"}}]}
-
-# Complex nested conditions
-GET /users?where={"$and":[{"isActive":{"$eq":true}},{"$or":[{"role":{"$eq":"admin"}},{"role":{"$eq":"moderator"}}]}]}
-```
-
-### Relations
-
-```bash
-# Load relations
-GET /users?relations=["posts"]
-
-# Load nested relations
-GET /users?relations=["posts","posts.comments"]
-
-# Load relations with specific fields
-GET /users?relations={"posts":{"select":["id","title"]}}
-
-# Load relations with filtering
-GET /users?relations={"posts":{"where":{"published":{"$eq":true}}}}
-
-# Load relations with join type
-GET /users?relations={"posts":{"joinType":"left"}}
-```
-
-### Field Selection
-
-```bash
-# Select specific fields
-GET /users?select=["id","email","firstName"]
-
-# Combine with relations
-GET /users?select=["id","email"]&relations={"posts":{"select":["id","title"]}}
-```
-
-### Pagination
-
-```bash
-# Skip and take
-GET /users?skip=0&take=10
-
-# Page 2 (skip 10, take 10)
-GET /users?skip=10&take=10
-```
-
-### Sorting
-
-```bash
-# Sort by single field
-GET /users?order={"createdAt":"DESC"}
-
-# Sort by multiple fields
-GET /users?order={"createdAt":"DESC","email":"ASC"}
-```
-
-### Soft Deletes
-
-```bash
-# Include soft-deleted records
-GET /users?withDeleted=true
-
-# Only show soft-deleted records
-GET /users?onlyDeleted=true
-```
-
-## Advanced Configuration
-
-### Custom Routes
-
-```typescript
-@Crud({
-  entity: User,
-  routes: {
-    findAll: {
-      decorators: [UseGuards(AuthGuard)], // Add guards
+{
+  "bulk": [
+    {
+      "email": "a@example.com",
+      "firstName": "Alice",
+      "lastName": "One"
     },
-    findOne: true,
-    create: {
-      decorators: [UseInterceptors(LoggingInterceptor)], // Add interceptors
-    },
-    update: true,
-    delete: false, // Disable delete endpoint
-  },
-})
-@Controller('users')
-export class UserController {
-  constructor(public service: UserService) {}
-}
-```
-
-### Custom Actions
-
-```typescript
-@Crud({
-  entity: User,
-  routes: {
-    findAll: true,
-    findOne: true,
-    create: true,
-    update: true,
-    delete: true,
-  },
-})
-@Controller('users')
-export class UserController {
-  constructor(public service: UserService) {}
-
-  // Add custom endpoints
-  @Get('active')
-  async getActiveUsers() {
-    return this.service.find({
-      where: { isActive: true },
-    });
-  }
-}
-```
-
-### Service Customization
-
-```typescript
-@Injectable()
-export class UserService extends CrudService<User> {
-  constructor(
-    @InjectRepository(User)
-    protected repository: Repository<User>,
-  ) {
-    super(repository);
-  }
-
-  // Override create method
-  async create(data: Partial<User>): Promise<User> {
-    // Add custom logic before create
-    const hashedPassword = await this.hashPassword(data.password);
-    data.password = hashedPassword;
-
-    return super.create(data);
-  }
-
-  // Override update method
-  async update(id: number, data: Partial<User>): Promise<User> {
-    // Add custom logic before update
-    if (data.password) {
-      data.password = await this.hashPassword(data.password);
+    {
+      "email": "b@example.com",
+      "firstName": "Bob",
+      "lastName": "Two"
     }
-
-    return super.update(id, data);
-  }
-
-  // Add custom methods
-  async findByEmail(email: string): Promise<User> {
-    return this.repository.findOne({ where: { email } });
-  }
-
-  private async hashPassword(password: string): Promise<string> {
-    // Your hashing logic
-    return password;
-  }
+  ]
 }
 ```
 
-### Validation
+Bulk update:
 
-Use class-validator decorators on your DTOs:
+```http
+PUT /users/bulk
+Content-Type: application/json
 
-```typescript
-import { IsEmail, IsString, MinLength } from 'class-validator';
-
-export class CreateUserDto {
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  @MinLength(2)
-  firstName: string;
-
-  @IsString()
-  @MinLength(2)
-  lastName: string;
-
-  @IsString()
-  @MinLength(8)
-  password: string;
+{
+  "bulk": [
+    {
+      "id": "123",
+      "firstName": "Alice Updated"
+    },
+    {
+      "id": "456",
+      "firstName": "Bob Updated"
+    }
+  ]
 }
 ```
 
-Then use it in your controller:
+Bulk delete:
 
-```typescript
+```http
+DELETE /users/delete/bulk?ids=123&ids=456
+```
+
+Restore many with soft delete enabled:
+
+```http
+PUT /users/restore/bulk
+Content-Type: application/json
+
+{
+  "ids": ["123", "456"]
+}
+```
+
+## Supported Operators
+
+| Operator | Meaning |
+| --- | --- |
+| `$eq` | equal |
+| `$ne` | not equal |
+| `$gt` | greater than |
+| `$gte` | greater than or equal |
+| `$lt` | less than |
+| `$lte` | less than or equal |
+| `$in` | in array |
+| `$notIn` | not in array |
+| `$like` | like |
+| `$notLike` | not like |
+| `$iLike` | case-insensitive like |
+| `$notIlike` | case-insensitive not like |
+| `$startsWith` | starts with |
+| `$endsWith` | ends with |
+| `$iStartsWith` | case-insensitive starts with |
+| `$iEndsWith` | case-insensitive ends with |
+| `$inL` | case-insensitive in |
+| `$notinL` | case-insensitive not in |
+| `$contArr` | postgres array contains |
+| `$intersectsArr` | postgres array intersects |
+| `$isNull` | is null |
+| `$isNotNull` | is not null |
+| `$between` | between |
+| `$notBetween` | not between |
+| `$isTrue` | is true |
+| `$isFalse` | is false |
+| `$and` | logical and |
+| `$or` | logical or |
+
+## Relations, Select, Sorting, Pagination
+
+Examples:
+
+```http
+GET /users?relations=["posts"]
+GET /users?relations={"posts":{"select":["id","title"]}}
+GET /users?relations={"posts":{"where":{"published":{"$eq":true}}}}
+GET /users?select=["id","email","firstName"]
+GET /users?order={"createdAt":"DESC","email":"ASC"}
+GET /users?take=20&skip=40
+GET /users?withDeleted=true
+```
+
+Notes:
+
+- `findMany()` returns `{ items, total }`
+- `findAll()` returns `T[]`
+- list routes enforce `maxPerPage`
+- `findAll()` removes `skip`
+- `counts()` removes pagination fields before counting
+
+## DTOs And Validation
+
+You can pass DTO classes for create and update:
+
+```ts
 @Crud({
+  path: 'users',
   entity: User,
   dto: {
     create: CreateUserDto,
     update: UpdateUserDto,
   },
-  routes: {
-    findAll: true,
-    findOne: true,
-    create: true,
-    update: true,
-    delete: true,
-  },
 })
-@Controller('users')
-export class UserController {
-  constructor(public service: UserService) {}
+```
+
+This affects:
+
+- request body typing
+- validation
+- Swagger request models
+
+## Service Hooks
+
+Override hooks in your service when you need custom behavior:
+
+- `beforeSave`
+- `afterSave`
+- `beforeCreate` / `afterCreate`
+- `beforeUpdate` / `afterUpdate`
+- `beforeFindMany`
+- `beforeCounts`
+- `beforeFindOne`
+- `beforeDelete` / `afterDelete`
+- `beforeDeleteMany` / `afterDeleteMany`
+- `beforeRestore` / `afterRestore`
+
+Example:
+
+```ts
+protected async beforeSave(entity: Partial<User>) {
+  if (entity.email) {
+    entity.email = entity.email.trim().toLowerCase();
+  }
+  return entity;
 }
 ```
 
-## Query Builder Debugging
+## Override Generated Routes
 
-Enable debug mode to see step-by-step query builder logs:
+If you define a controller method with the same name as a CRUD action, the package keeps your method and still applies route metadata.
 
-### Option 1: Query Parameter
+```ts
+import { Query } from '@nestjs/common';
+import { CRUD_OPTIONS_METADATA, RequestQueryParser } from '@ackplus/nest-crud';
 
-```bash
-GET /users?debug=true
+@Crud({
+  path: 'users',
+  entity: User,
+  routes: {
+    findMany: { enabled: true },
+  },
+})
+export class UserController {
+  constructor(public service: UserService) {}
+
+  async findMany(@Query() query: any) {
+    const crudOptions = Reflect.getMetadata(CRUD_OPTIONS_METADATA, this.constructor);
+    const parsed = RequestQueryParser.parse(query);
+
+    parsed.where = parsed.where
+      ? { $and: [parsed.where, { isActive: { $eq: true } }] }
+      : { isActive: { $eq: true } };
+
+    return this.service.findMany(parsed, crudOptions);
+  }
+}
 ```
 
-### Option 2: Environment Variable
+Do not add `@Get()`, `@Post()`, and similar route decorators to that override method. `@Crud()` sets the route metadata.
 
-```bash
-NEST_CRUD_DEBUG=1
-```
+## Other Useful Exports
 
-Debug logs will appear in the console prefixed with `[NestCrud:<builder>]` showing:
-- Pagination logic
-- Join construction
-- Relations processing
-- Where clause building
+- `CrudConfigService.load()` for global defaults
+- `FindQueryBuilder` for custom endpoints that still use the package query format
+- `RequestQueryParser` for normalizing raw query params
+- `BaseEntity` with `id`, `createdAt`, `updatedAt`, and `deletedAt`
+- `BaseEntityWithOrder` with an additional `order` column
+- `getAction(handler)` to read CRUD action metadata in interceptors
 
-Example output:
+## Known Limitations
 
-```
-[NestCrud:FindQueryBuilder] Building query with options: {...}
-[NestCrud:JoinQueryBuilder] Processing relations: ["posts"]
-[NestCrud:WhereQueryBuilder] Building where clause: {"isActive":{"$eq":true}}
-```
+These are real current constraints from the codebase:
 
-## TypeORM Query Builder Integration
+- primary key handling assumes the field is named `id`
+- `reorder()` expects an array of ids, while the generated DTO shape is awkward for direct HTTP use
+- `deleteMany()` currently works with `ids`, not a `where` delete contract
+- some exported `CrudOptions` fields are present in types but not cleanly implemented as public features, so they are intentionally not documented here
 
-You can also use the underlying query builder helpers directly:
+## Example App
 
-```typescript
-import { FindQueryBuilder } from '@ackplus/nest-crud';
-
-const queryBuilder = new FindQueryBuilder(repository);
-const result = await queryBuilder.build({
-  where: { isActive: true },
-  relations: ['posts'],
-  select: ['id', 'email', 'firstName'],
-  skip: 0,
-  take: 10,
-  order: { createdAt: 'DESC' },
-});
-```
-
-## Operators Reference
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `$eq` | Equal | `{"age":{"$eq":25}}` |
-| `$ne` | Not equal | `{"status":{"$ne":"banned"}}` |
-| `$gt` | Greater than | `{"age":{"$gt":18}}` |
-| `$gte` | Greater than or equal | `{"age":{"$gte":18}}` |
-| `$lt` | Less than | `{"age":{"$lt":65}}` |
-| `$lte` | Less than or equal | `{"age":{"$lte":65}}` |
-| `$in` | In array | `{"role":{"$in":["admin","mod"]}}` |
-| `$notIn` | Not in array | `{"role":{"$notIn":["banned"]}}` |
-| `$like` | Like (case-sensitive) | `{"email":{"$like":"%@example.com"}}` |
-| `$notLike` | Not like | `{"email":{"$notLike":"%spam%"}}` |
-| `$iLike` | Like (case-insensitive) | `{"name":{"$iLike":"%john%"}}` |
-| `$notIlike` | Not like (case-insensitive) | `{"name":{"$notIlike":"%test%"}}` |
-| `$isNull` | Is null | `{"deletedAt":{"$isNull":true}}` |
-| `$isNotNull` | Is not null | `{"deletedAt":{"$isNotNull":true}}` |
-| `$between` | Between | `{"age":{"$between":[18,65]}}` |
-| `$notBetween` | Not between | `{"age":{"$notBetween":[0,17]}}` |
-| `$isTrue` | Is true | `{"isActive":{"$isTrue":true}}` |
-| `$isFalse` | Is false | `{"isActive":{"$isFalse":true}}` |
-| `$and` | Logical AND | `{"$and":[{...},{...}]}` |
-| `$or` | Logical OR | `{"$or":[{...},{...}]}` |
-
-## Best Practices
-
-1. **Use DTOs for validation** - Always create separate DTOs for create and update operations
-2. **Limit field selection** - Use `select` parameter to reduce payload size
-3. **Paginate large datasets** - Always use `skip` and `take` for large collections
-4. **Index your filters** - Add database indexes for frequently filtered fields
-5. **Limit relations depth** - Avoid loading too many nested relations
-6. **Use guards** - Protect your endpoints with authentication and authorization guards
-7. **Handle errors** - Implement proper error handling in your services
-8. **Enable debug mode** - Use debug mode during development to understand query construction
-
-## Examples
-
-See the [example-app](../../apps/example-app) directory for a complete working example with:
-- User and Post entities with relations
-- CRUD controllers and services
-- Custom endpoints
-- Validation
-- Seeders for test data
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+See [`../../apps/example-app`](../../apps/example-app) for a working NestJS app using this package.
