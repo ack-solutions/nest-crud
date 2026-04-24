@@ -1,39 +1,63 @@
-# nest-crud Monorepo
+# nest-crud
 
-This repo contains two packages:
+A monorepo for two complementary packages:
 
-- [`@ackplus/nest-crud`](./packages/nest-crud/README.md): NestJS + TypeORM CRUD generation
-- [`@ackplus/nest-crud-request`](./packages/nest-crud-request/README.md): query builder for frontend or shared TypeScript code
+| Package | Purpose |
+| --- | --- |
+| [`@ackplus/nest-crud`](./packages/nest-crud) | NestJS + TypeORM CRUD generator — `@Crud()` decorator, `CrudService<T>`, request parser, Swagger metadata |
+| [`@ackplus/nest-crud-request`](./packages/nest-crud-request) | Framework-agnostic query builder for frontends and shared TypeScript code |
 
-## Which README To Use
+Both share the same request-query format (`where`, `relations`, `select`, `order`, `take`, `skip`, `withDeleted`, `onlyDeleted`), so clients built with `nest-crud-request` work against servers built with `nest-crud`.
 
-- Read [`packages/nest-crud/README.md`](./packages/nest-crud/README.md) if you are building backend CRUD APIs in NestJS.
-- Read [`packages/nest-crud-request/README.md`](./packages/nest-crud-request/README.md) if you need to build compatible query params from React, Angular, Vue, or shared utilities.
-- Read [`apps/example-app/README.md`](./apps/example-app/README.md) only if you want a working demo app.
+## Which one do I read?
 
-## What The Repo Provides
+- Backend (NestJS + TypeORM): [`packages/nest-crud/README.md`](./packages/nest-crud/README.md)
+- Frontend / shared client (React, Angular, Vue, Node): [`packages/nest-crud-request/README.md`](./packages/nest-crud-request/README.md)
 
-- Generated CRUD routes with `@Crud()`
-- Reusable `CrudService<T>` for TypeORM repositories
-- Filtering, relations, select, sorting, pagination, and soft-delete query parsing
-- Shared request-builder package using the same query format
+## Install
 
-## Important Runtime Notes
+```bash
+# backend
+npm install @ackplus/nest-crud
 
-- `@Crud()` already applies `@Controller(...)`. Set `path` inside `@Crud()`.
-- Use explicit route objects such as `findMany: { enabled: true }`.
-- `GET /resource` is `findMany()` and returns `{ items, total }`.
-- `GET /resource/get/all` is `findAll()` and returns `T[]`.
-- Generated update routes use `PUT`, not `PATCH`.
-- The current service logic assumes the primary key field is named `id`.
+# client
+npm install @ackplus/nest-crud-request
+```
 
-## Standard Documentation Structure
+They can be used independently. You don't need `nest-crud-request` on the backend, and you don't need `nest-crud` on the frontend.
 
-This repo now uses a smaller documentation layout:
+## What you get
 
-- `README.md`
-- `packages/nest-crud/README.md`
-- `packages/nest-crud-request/README.md`
-- `apps/example-app/README.md`
+- Generated REST routes from a single `@Crud({ path, entity, routes })` decorator
+- Reusable `CrudService<T>` with 15+ CRUD actions and lifecycle hooks
+- Rich query format: filters, relations, select, sort, pagination, soft-delete
+- 26 comparison operators plus `$and` / `$or`
+- Bulk create / update / delete / restore
+- Soft-delete aware (trash & restore routes)
+- `reorder` support via `BaseEntityWithOrder`
+- Swagger / OpenAPI metadata applied automatically
+- Type-safe query builder (`QueryBuilder`, `WhereBuilder`) for clients
 
-Everything else in the repo should be treated as source code or supplementary examples, not primary documentation.
+## Gotchas worth knowing up front
+
+- `@Crud()` already applies `@Controller(...)` — put `path` inside `@Crud()`, don't stack a second `@Controller()`.
+- Update is `PUT /:id`, not `PATCH`.
+- `GET /resource` is `findMany` and returns `{ items, total }`.
+- `GET /resource/get/all` is `findAll` and returns `T[]`.
+- `BaseEntity` uses a UUID primary key named `id`. The service assumes the primary key is named `id`.
+- Soft-delete routes (`/:id/restore`, `/:id/trash`, `/restore/bulk`, `/trash/bulk`) are only generated when `softDelete: true`.
+- List routes enforce `maxPerPage` (defaults to 5000 via `CrudConfigService`).
+
+## Repo layout
+
+```
+packages/
+  nest-crud/            # backend package
+  nest-crud-request/    # client query builder
+apps/
+  example-app/          # working NestJS demo
+```
+
+## License
+
+MIT © Ackplus
