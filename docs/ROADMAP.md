@@ -24,7 +24,7 @@ well-documented, and safe to upgrade — **without breaking existing users**.
   400-not-500, reorder transaction, maxPerPage, withDeleted/onlyDeleted validation), `where`-key
   hardening, soft-delete/guards/interceptors/hooks/Swagger-contract coverage. **156 tests, ~86% lines, CI-gated.**
 - [x] **Phase 3 — Swagger polish** ✅ (writable create/update DTOs, uuid path params, correct array responses)
-- [ ] **Phase 4 — Developer documentation**
+- [x] **Phase 4 — Developer documentation** ✅ — core guides + CHANGELOG (hosted docs site & framework guides deferred)
 - [ ] **Phase 5 — v2.0 breaking polish** (+ migration guide)
 
 ---
@@ -101,7 +101,12 @@ Lands the **non-breaking bug fixes** (each with a regression test).
   pagination items, `format: uuid` on id params, real `reorder` response schema.
 - Verify clean output on `@nestjs/swagger` v10 and v11.
 
-## Phase 4 — Developer documentation (non-breaking, v1.x)
+## Phase 4 — Developer documentation (non-breaking, v1.x) ✅ core docs done
+
+> Done: getting-started, querying, configuration, lifecycle-hooks, soft-delete,
+> auth-and-guards, error-handling, troubleshooting, docs index, CHANGELOG, and the
+> in-Swagger doc links now resolve to `docs/querying.md`.
+> Deferred: a hosted docs site (VitePress + Pages) and rewritten React/Angular/Vue guides.
 
 - Docs site at `ack-solutions.github.io/nest-crud` (where Swagger already links).
 - Author getting-started, configuration, routes, querying (all 26 operators),

@@ -48,6 +48,16 @@ They can be used independently. You don't need `nest-crud-request` on the backen
 - Soft-delete routes (`/:id/restore`, `/:id/trash`, `/restore/bulk`, `/trash/bulk`) are only generated when `softDelete: true`.
 - List routes enforce `maxPerPage` (defaults to 5000 via `CrudConfigService`).
 
+## Documentation
+
+Full guides live in [`docs/`](./docs/):
+
+- [Getting started](./docs/getting-started.md) — entity → service → controller → first request
+- [Querying](./docs/querying.md) — operators, relations, pagination, counts, soft-delete, bulk
+- [Configuration](./docs/configuration.md) · [Lifecycle hooks](./docs/lifecycle-hooks.md) · [Auth & guards](./docs/auth-and-guards.md)
+- [Soft delete](./docs/soft-delete.md) · [Error handling](./docs/error-handling.md) · [Troubleshooting](./docs/troubleshooting.md)
+- [Changelog](./CHANGELOG.md) · [Roadmap](./docs/ROADMAP.md)
+
 ## Repo layout
 
 ```

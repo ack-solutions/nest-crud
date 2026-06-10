@@ -1,0 +1,56 @@
+# Troubleshooting
+
+## My CRUD routes return 404
+
+Almost always one of:
+
+1. **You stacked a second `@Controller()`.** `@Crud()` already applies
+   `@Controller(path)`. Adding another `@Controller('users')` underneath it breaks
+   route registration. Put the path inside `@Crud({ path: 'users' })` and remove
+   the extra decorator.
+2. **No `path` (and you removed `@Controller`).** Without `path`, the controller
+   mounts at the entity name (e.g. `/User`). Set `path: 'users'`.
+3. **The route is disabled.** Routes you list with `{ enabled: false }` (or the
+   shorthand `false`) are not registered.
+
+## "Service is not defined…"
+
+The controller must expose the service as a property literally named `service`:
+
+```ts
+export class UserController {
+  constructor(public service: UserService) {} // ← `public service`
+}
+```
+
+## A custom endpoint clashes with `/:id`
+
+Define custom static routes (e.g. `@Get('active')`) in the controller body — they
+are registered before the generated `/:id` route, so `/users/active` won't be
+captured as `findOne('active')`. The generated `/bulk` and `/reorder` routes are
+likewise ordered ahead of `/:id`.
+
+## `?withDeleted=true` (or `onlyDeleted`) returns 400
+
+Fixed in the current version — these flags now coerce `"true"`/`"1"` to booleans.
+If you still see it, make sure you're on the latest release.
+
+## Filtering by a column returns 400 "Invalid filter field"
+
+Only real entity columns and resolvable relation paths are accepted in `where`.
+Check the spelling, and for relation columns include the relation:
+`relations=["profile"]&where={"profile.age":{"$gte":18}}`.
+
+## Postgres array operators error on SQLite/MySQL
+
+`$contArr` and `$intersectsArr` are PostgreSQL-only and return 400 elsewhere.
+
+## Peer dependency warnings on install
+
+The package peer-depends on NestJS 10/11, TypeORM 0.3, `class-validator`,
+`class-transformer`, and `@nestjs/swagger`. Install versions that match your app.
+
+## Soft-delete routes don't exist
+
+`/:id/restore`, `/:id/trash`, `/restore/bulk`, `/trash/bulk` are only generated
+when you pass `softDelete: true` to `@Crud()`.
