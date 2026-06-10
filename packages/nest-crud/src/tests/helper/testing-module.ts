@@ -32,7 +32,7 @@ export async function createCrudTestingModule(crudOptions: CrudOptions): Promise
 
     @Crud(crudOptions)
     class UserCrudController {
-        constructor(_service: CrudService<User>) { }
+        constructor(public service: CrudService<User>) { }
     }
 
     const module: TestingModule = await Test.createTestingModule({

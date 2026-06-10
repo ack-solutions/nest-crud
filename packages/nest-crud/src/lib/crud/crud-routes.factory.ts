@@ -103,16 +103,29 @@ export class CrudRoutesFactory {
         // Register entity for Swagger models once
         this.setResponseModels();
 
-        // Create Routes Schema
+        // Create Routes Schema.
+        // Sort so static paths (e.g. `/bulk`, `/reorder`) are registered before
+        // parameterised paths (`/:id`); otherwise the Express router matches
+        // `PUT /bulk` as `update` with `id = "bulk"`. The sort is stable, so routes
+        // with the same number of params keep their configured order.
         const routes = Object.keys(this.options.routes || {})
             .map((key) => {
                 return {
                     ...this.options.routes?.[key],
                     name: key as CrudActionsEnum,
                 };
-            });
+            })
+            .sort((a, b) => this.routeParamCount(a.path) - this.routeParamCount(b.path));
         this.createRoutes(routes);
         this.enableRoutes(routes);
+    }
+
+    /**
+     * Counts the `:param` segments in a route path. Used to register static routes
+     * before parameterised ones so specific paths aren't shadowed by `/:id`.
+     */
+    private routeParamCount(path?: string): number {
+        return (path || '').split('/').filter((segment) => segment.startsWith(':')).length;
     }
 
     /**
@@ -131,9 +144,16 @@ export class CrudRoutesFactory {
             ...query,
         };
 
-        // Merge routes config with global defaults (array values are replaced, not merged)
-        const routes = isObjectFull(this.options.routes) ? this.options.routes : {};
-        this.options.routes = deepmerge(CrudConfigService.config.routes as CrudRoutesOptions, routes as CrudRoutesOptions, {
+        // Merge routes config with global defaults (array values are replaced, not merged).
+        // Normalise the shorthand `routes: { findMany: true }` / `{ delete: false }` to
+        // `{ enabled: boolean }` first, so a boolean merges with the default path/method
+        // instead of replacing the whole route object (which left `enabled` undefined).
+        const userRoutes = isObjectFull(this.options.routes) ? this.options.routes : {};
+        const normalizedRoutes: Record<string, any> = {};
+        for (const [key, value] of Object.entries(userRoutes)) {
+            normalizedRoutes[key] = typeof value === 'boolean' ? { enabled: value } : value;
+        }
+        this.options.routes = deepmerge(CrudConfigService.config.routes as CrudRoutesOptions, normalizedRoutes as CrudRoutesOptions, {
             arrayMerge: (_a, b, _c) => b,
         });
 

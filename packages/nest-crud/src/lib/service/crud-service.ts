@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { sumBy, uniq } from 'lodash';
 import { FindOptionsWhere, In, Repository, SaveOptions, SelectQueryBuilder } from 'typeorm';
 import type { DeepPartial } from 'typeorm';
@@ -292,7 +292,7 @@ export class CrudService<T extends BaseEntity> {
      */
     async create(data: Partial<T>, saveOptions: SaveOptions = {}): Promise<T> {
         if (!data || Object.keys(data).length === 0) {
-            throw new Error('No data provided for insert.');
+            throw new BadRequestException('No data provided for insert.');
         }
         data = await this.beforeSave(data);
 
@@ -346,12 +346,23 @@ export class CrudService<T extends BaseEntity> {
 
             const savedEntities = await manager.save<T>(entities as T[], saveOptions);
 
-            for (let i = 0; i < savedEntities.length; i++) {
-                await this.afterSave(savedEntities[i], null, data.bulk[i]);
-                await this.afterCreate(savedEntities[i], null, data.bulk[i]);
+            // Reload so generated columns / DB defaults / relations are present,
+            // matching the single create() behaviour.
+            const primaryKey = this.repository.metadata.primaryColumns[0].propertyName;
+            const reloaded = await Promise.all(
+                savedEntities.map((saved: any) =>
+                    manager.findOneByOrFail(this.repository.target as any, {
+                        [primaryKey]: saved[primaryKey],
+                    }),
+                ),
+            ) as T[];
+
+            for (let i = 0; i < reloaded.length; i++) {
+                await this.afterSave(reloaded[i], null, data.bulk[i]);
+                await this.afterCreate(reloaded[i], null, data.bulk[i]);
             }
 
-            return savedEntities;
+            return reloaded;
         });
     }
 
@@ -436,11 +447,13 @@ export class CrudService<T extends BaseEntity> {
             total: 0,
         }
 
+        const primaryColumn = this.repository.metadata.primaryColumns[0].propertyName;
+
         // No groupByKey: return total count
         if (!groupByKey) {
-            query.select(`COUNT("${query.alias}"."id")`, 'count');
-            const response = await query.getRawOne() as { count: number };
-            result.total = Number(response.count) || 0;
+            query.select(`COUNT("${query.alias}"."${primaryColumn}")`, 'count');
+            const response = await query.getRawOne() as { count: number } | undefined;
+            result.total = Number(response?.count) || 0;
             return result;
         }
 
@@ -450,11 +463,11 @@ export class CrudService<T extends BaseEntity> {
         const invalidKeys = groupKeys.filter(key => !validColumns.includes(key));
 
         if (invalidKeys.length) {
-            throw new Error(`Invalid groupByKey: ${invalidKeys.join(', ')}. Valid columns are: ${validColumns.join(', ')}`);
+            throw new BadRequestException(`Invalid groupByKey: ${invalidKeys.join(', ')}. Valid columns are: ${validColumns.join(', ')}`);
         }
 
         // Add COUNT and groupings
-        query.select(`COUNT("${query.alias}"."id")`, 'count');
+        query.select(`COUNT("${query.alias}"."${primaryColumn}")`, 'count');
         groupKeys.forEach(key => {
             query.addSelect(`"${query.alias}"."${key}"`, key);
             query.addGroupBy(`"${query.alias}"."${key}"`);
@@ -495,12 +508,12 @@ export class CrudService<T extends BaseEntity> {
             ...(parsedOptions?.where || {})
         };
 
-        const builder = queryBuilder.build({
+        let builder = queryBuilder.build({
             ...(parsedOptions || {}),
             where: whereWithId,
         });
 
-        await this.beforeFindOne(builder, { id, ...query });
+        builder = await this.beforeFindOne(builder, { id, ...query });
 
         const results = await builder.getOne();
         if (!results) {
