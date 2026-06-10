@@ -115,6 +115,5 @@ export interface ICountsResult {
 
 export interface IDeleteManyOptions {
     ids?: string[];
-    // where?: WhereOptions;
     [extraQueryParams: string]: any;
 }

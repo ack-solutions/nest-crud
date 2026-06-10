@@ -67,6 +67,12 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Run tests (gate release)
+        run: pnpm -r test
+
+      - name: Run e2e tests (gate release)
+        run: pnpm -C apps/example-app test:e2e
+
       - name: Publish packages
         shell: bash
         run: |

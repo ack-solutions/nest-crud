@@ -1,5 +1,5 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Get, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Crud } from '@ackplus/nest-crud';
 import { User } from '../database/entities/user.entity';
 import { UserService } from './user.service';
@@ -7,15 +7,15 @@ import { UserService } from './user.service';
 @ApiTags('users')
 @Crud({
   entity: User,
+  path: 'users',
   routes: {
-    findMany: true,
-    findOne: true,
-    create: true,
-    update: true,
-    delete: true,
+    findMany: { enabled: true },
+    findOne: { enabled: true },
+    create: { enabled: true },
+    update: { enabled: true },
+    delete: { enabled: true },
   },
 })
-@Controller('users')
 export class UserController {
   constructor(public service: UserService) {}
 

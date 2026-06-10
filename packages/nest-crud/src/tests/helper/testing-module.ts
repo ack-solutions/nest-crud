@@ -11,6 +11,7 @@ import { Post } from './entities/post-test.entity';
 import { Comment } from './entities/comment-test.entity';
 import { ProfileAddress } from './entities/profile-address-test.entity';
 import { Country } from './entities/country-test.entity';
+import { OrderedItem } from './entities/ordered-item-test.entity';
 
 export interface TestModuleOptions {
     controllers?: Type<any>[];
@@ -18,10 +19,11 @@ export interface TestModuleOptions {
     imports?: any[];
 }
 
+// sql.js = pure-WASM SQLite: no native build, works on any Node version / CI.
 const dbConfig = {
-    type: 'sqlite',
-    database: ':memory:',
-    entities: [User, Profile, Post, Comment, ProfileAddress, Country],
+    type: 'sqljs',
+    autoSave: false,
+    entities: [User, Profile, Post, Comment, ProfileAddress, Country, OrderedItem],
     synchronize: true,
     logging: ['error', 'warn'],
 } as any
@@ -31,13 +33,13 @@ export async function createCrudTestingModule(crudOptions: CrudOptions): Promise
 
     @Crud(crudOptions)
     class UserCrudController {
-        constructor(_service: CrudService<User>) { }
+        constructor(public service: CrudService<User>) { }
     }
 
     const module: TestingModule = await Test.createTestingModule({
         imports: [
             TypeOrmModule.forRoot(dbConfig),
-            TypeOrmModule.forFeature([User, Profile, Post, Comment, ProfileAddress, Country]),
+            TypeOrmModule.forFeature([User, Profile, Post, Comment, ProfileAddress, Country, OrderedItem]),
         ],
         controllers: [UserCrudController],
         providers: [

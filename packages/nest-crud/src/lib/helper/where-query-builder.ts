@@ -172,9 +172,19 @@ export class WhereQueryBuilder {
                     const groupedQuery = subParts.length > 1 ? `(${subParts.join(operator)})` : subParts.join(operator);
                     queryParts.push(groupedQuery);
                 }
+                continue;
             }
+
+            // Validate the field key against the entity's columns/relations before it
+            // becomes SQL. Identifiers are quoted downstream, so this is not the only
+            // injection guard, but rejecting unknown keys returns a clean 400 instead
+            // of leaking a database error and adds a layer of defense-in-depth.
+            if (!this.helper.isAllowedField(key)) {
+                throw new BadRequestException(`Invalid filter field: '${key}'`);
+            }
+
             // Handle comparison operators ($eq, $gt, $lt, etc.)
-            else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                 for (const op in value) {
                     const column = this.helper.getFieldWithAlias(key);
                     const val = value[op];
@@ -322,26 +332,44 @@ export class WhereQueryBuilder {
                 if (!Array.isArray(value)) {
                     throw new BadRequestException(`Operator ${operator} requires an array value`);
                 }
-                const textColumn = this.convertToText(columnName);
-                return {
-                    query: `LOWER(${textColumn}) NOT IN (:...${paramName})`,
-                    params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
-                };
+                if (value.length === 0) {
+                    return {
+                        query: '1 = 1',
+                        params: {}
+                    }; // NOT IN an empty set matches everything
+                } else {
+                    const textColumn = this.convertToText(columnName);
+                    return {
+                        query: `LOWER(${textColumn}) NOT IN (:...${paramName})`,
+                        params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
+                    };
+                }
 
             // Array operators
             case WhereOperatorEnum.IN:
-                if (Array.isArray(value) && value.length === 0) {
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                if (value.length === 0) {
                     return {
                         query: '1 = 0',
                         params: {}
                     }; // Always false for empty IN clause
-                } else {
-                    return {
-                        query: `${columnName} IN (:...${paramName})`,
-                        params: { [paramName]: value }
-                    };
                 }
+                return {
+                    query: `${columnName} IN (:...${paramName})`,
+                    params: { [paramName]: value }
+                };
             case WhereOperatorEnum.NOT_IN:
+                if (!Array.isArray(value)) {
+                    throw new BadRequestException(`Operator ${operator} requires an array value`);
+                }
+                if (value.length === 0) {
+                    return {
+                        query: '1 = 1',
+                        params: {}
+                    }; // NOT IN an empty set matches everything
+                }
                 return {
                     query: `${columnName} NOT IN (:...${paramName})`,
                     params: { [paramName]: value }
@@ -398,6 +426,9 @@ export class WhereQueryBuilder {
             // Range operators
             case WhereOperatorEnum.BETWEEN:
             case WhereOperatorEnum.NOT_BETWEEN: {
+                if (!Array.isArray(value) || value.length !== 2) {
+                    throw new BadRequestException(`Operator ${operator} requires a [start, end] array value`);
+                }
                 const [start, end] = value as any;
                 const isBetween = operator === WhereOperatorEnum.BETWEEN;
                 return {

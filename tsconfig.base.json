@@ -8,6 +8,9 @@
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    // Required for TypeORM: with ES2023, the default (true) emits class fields that
+    // overwrite hydrated entity columns with `undefined`. Do not change to true.
+    "useDefineForClassFields": false,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
     "sourceMap": true,

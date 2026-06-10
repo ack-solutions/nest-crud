@@ -191,15 +191,43 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
 
                 this.entityRelationsHash.set(field, toSave);
 
-                if (field) {
-                    this.entityRelationsHash.set(field, toSave);
-                }
-
                 return toSave;
             }
         } catch (_) {
             return null;
         }
+    }
+
+    /**
+     * Validate a where/order field path against the entity's columns and relations.
+     * A root-level key must be a known column; a dotted path must walk valid
+     * relations to a real column on the related entity. Used to reject unknown or
+     * hand-crafted keys with a clean 400 instead of leaking a database error
+     * (identifiers are also quoted downstream, so this is defense-in-depth).
+     */
+    public isAllowedField(field: string): boolean {
+        if (!field || typeof field !== 'string') {
+            return false;
+        }
+        // Accept any known column first — this also covers embedded-column paths
+        // such as 'name.first' (stored in entityColumns as a dotted propertyPath).
+        if (this.entityColumns.includes(field)) {
+            return true;
+        }
+        const parts = field.split('.');
+        if (parts.length === 1) {
+            return false;
+        }
+        let metadata = this.repository.metadata;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const relation = metadata.relations.find((rel) => rel.propertyName === parts[i]);
+            if (!relation) {
+                return false;
+            }
+            metadata = relation.inverseEntityMetadata;
+        }
+        const last = parts[parts.length - 1];
+        return metadata.columns.some((col) => col.propertyName === last || col.propertyPath === last);
     }
 
     /**

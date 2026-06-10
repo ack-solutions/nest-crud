@@ -28,12 +28,12 @@ export class Post extends BaseEntity {
   @Column({ default: 'draft' })
   status: string;
 
-  @ApiProperty({ 
-    description: 'Author ID',
-    example: 1
+  @ApiProperty({
+    description: 'Author ID (User UUID)',
+    example: '3fa85f64-5717-4562-b3fc-2c963f66afa6'
   })
   @Column()
-  authorId: number;
+  authorId: string;
 
   @ApiProperty({ 
     description: 'Post author',

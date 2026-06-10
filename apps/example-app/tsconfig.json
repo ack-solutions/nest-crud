@@ -9,6 +9,8 @@
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    // Required for TypeORM entity hydration — do not set to true (see tsconfig.base.json).
+    "useDefineForClassFields": false,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
     "sourceMap": true,

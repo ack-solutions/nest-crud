@@ -1,7 +1,6 @@
-import { expect } from '@jest/globals';
-
 /**
- * Test utilities for handling database-specific SQL differences
+ * Test utilities for handling database-specific SQL differences.
+ * `expect` is provided globally by Jest (typed via @types/jest in tsconfig.spec.json).
  */
 
 /**

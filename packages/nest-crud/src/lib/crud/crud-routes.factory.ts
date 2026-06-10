@@ -1,4 +1,5 @@
-import { UseGuards, ExecutionContext, CallHandler, NestInterceptor } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
+import { OmitType } from '@nestjs/swagger';
 import deepmerge from 'deepmerge';
 
 import {
@@ -103,16 +104,29 @@ export class CrudRoutesFactory {
         // Register entity for Swagger models once
         this.setResponseModels();
 
-        // Create Routes Schema
+        // Create Routes Schema.
+        // Sort so static paths (e.g. `/bulk`, `/reorder`) are registered before
+        // parameterised paths (`/:id`); otherwise the Express router matches
+        // `PUT /bulk` as `update` with `id = "bulk"`. The sort is stable, so routes
+        // with the same number of params keep their configured order.
         const routes = Object.keys(this.options.routes || {})
             .map((key) => {
                 return {
                     ...this.options.routes?.[key],
                     name: key as CrudActionsEnum,
                 };
-            });
+            })
+            .sort((a, b) => this.routeParamCount(a.path) - this.routeParamCount(b.path));
         this.createRoutes(routes);
         this.enableRoutes(routes);
+    }
+
+    /**
+     * Counts the `:param` segments in a route path. Used to register static routes
+     * before parameterised ones so specific paths aren't shadowed by `/:id`.
+     */
+    private routeParamCount(path?: string): number {
+        return (path || '').split('/').filter((segment) => segment.startsWith(':')).length;
     }
 
     /**
@@ -131,9 +145,16 @@ export class CrudRoutesFactory {
             ...query,
         };
 
-        // Merge routes config with global defaults (array values are replaced, not merged)
-        const routes = isObjectFull(this.options.routes) ? this.options.routes : {};
-        this.options.routes = deepmerge(CrudConfigService.config.routes as CrudRoutesOptions, routes as CrudRoutesOptions, {
+        // Merge routes config with global defaults (array values are replaced, not merged).
+        // Normalise the shorthand `routes: { findMany: true }` / `{ delete: false }` to
+        // `{ enabled: boolean }` first, so a boolean merges with the default path/method
+        // instead of replacing the whole route object (which left `enabled` undefined).
+        const userRoutes = isObjectFull(this.options.routes) ? this.options.routes : {};
+        const normalizedRoutes: Record<string, any> = {};
+        for (const [key, value] of Object.entries(userRoutes)) {
+            normalizedRoutes[key] = typeof value === 'boolean' ? { enabled: value } : value;
+        }
+        this.options.routes = deepmerge(CrudConfigService.config.routes as CrudRoutesOptions, normalizedRoutes as CrudRoutesOptions, {
             arrayMerge: (_a, b, _c) => b,
         });
 
@@ -654,6 +675,24 @@ export class CrudRoutesFactory {
         R.setRouteArgs(args, this.target, name);
     }
 
+    private writableDto: any;
+
+    /**
+     * Default request-body DTO for create/update: the entity minus server-managed
+     * fields (id, timestamps, soft-delete column) so they are not shown as writable
+     * in Swagger. The service still filters unknown/extra fields at runtime, so a
+     * client that sends them is unaffected.
+     */
+    private getWritableDto() {
+        if (!this.writableDto) {
+            this.writableDto = OmitType(this.entity, ['id', 'createdAt', 'updatedAt', 'deletedAt'] as any);
+            Object.defineProperty(this.writableDto, 'name', {
+                value: `Writable${this.entity?.name || 'Entity'}Dto`,
+            });
+        }
+        return this.writableDto;
+    }
+
     /**
      * Sets TypeScript type metadata for route arguments
      *
@@ -684,7 +723,7 @@ export class CrudRoutesFactory {
                 break;
             }
             case 'create': {
-                const createDto = this.options.dto?.create || this.entity;
+                const createDto = this.options.dto?.create || this.getWritableDto();
                 R.setRouteArgsTypes([createDto], this.targetProto, name);
                 break;
             }
@@ -694,7 +733,7 @@ export class CrudRoutesFactory {
                 break;
             }
             case 'update': {
-                const updateDto = this.options.dto?.update || this.entity;
+                const updateDto = this.options.dto?.update || this.getWritableDto();
                 R.setRouteArgsTypes([String, updateDto], this.targetProto, name);
                 break;
             }
@@ -739,32 +778,11 @@ export class CrudRoutesFactory {
     // ============================================================================
 
     /**
-     * Creates an interceptor that sets the CRUD method name on the request object
-     * This allows other interceptors to access the method name via request.crudMethod
-     *
-     * @param methodName - The CRUD method name (e.g., 'findMany', 'create', etc.)
-     * @returns A NestJS interceptor that sets the method name on the request
-     */
-    // protected createMethodNameInterceptor(methodName: CrudActionsEnum): NestInterceptor {
-    //     return {
-    //         intercept(context: ExecutionContext, next: CallHandler) {
-    //             const request = context.switchToHttp().getRequest();
-    //             // Set the CRUD method name on the request object so other interceptors can access it
-    //             request[CRUD_METHOD_NAME_KEY] = methodName;
-    //             return next.handle();
-    //         },
-    //     };
-    // }
-
-    /**
      * Sets up interceptors for a route
      *
      * Interceptors can be configured per-route or globally.
      * If the route is overridden, existing interceptors are preserved and merged
      * with configured interceptors.
-     *
-     * The method name interceptor is added first so other interceptors can access
-     * the CRUD method name via request.crudMethod
      *
      * @param name - Route name
      */
@@ -772,11 +790,7 @@ export class CrudRoutesFactory {
         const configuredInterceptors = (this.options.routes?.[name] as any)?.interceptors || [];
         const existingInterceptors = R.getInterceptors(this.targetProto[name]) || [];
 
-        // Create the method name interceptor that sets the method on the request
-        // const methodNameInterceptor = this.createMethodNameInterceptor(name);
-
-        // Merge interceptors: method name interceptor first, then existing, then configured
-        // Method name interceptor must be first so other interceptors can access it
+        // Merge interceptors from an overridden handler with the configured ones
         const allInterceptors = [
             ...(isArrayFull(existingInterceptors) ? existingInterceptors : []),
             ...(isArrayFull(configuredInterceptors) ? configuredInterceptors : []),
