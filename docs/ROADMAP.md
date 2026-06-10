@@ -23,7 +23,7 @@ well-documented, and safe to upgrade — **without breaking existing users**.
   9 bug fixes (route ordering, boolean routes, beforeFindOne, counts PK, createMany reload,
   400-not-500, reorder transaction, maxPerPage, withDeleted/onlyDeleted validation), `where`-key
   hardening, soft-delete/guards/interceptors/hooks/Swagger-contract coverage. **156 tests, ~86% lines, CI-gated.**
-- [ ] **Phase 3 — Swagger polish**
+- [x] **Phase 3 — Swagger polish** ✅ (writable create/update DTOs, uuid path params, correct array responses)
 - [ ] **Phase 4 — Developer documentation**
 - [ ] **Phase 5 — v2.0 breaking polish** (+ migration guide)
 
@@ -94,7 +94,7 @@ Lands the **non-breaking bug fixes** (each with a regression test).
 - Swagger contract/snapshot test (operationIds, status codes, body schemas).
 - Coverage thresholds in CI.
 
-## Phase 3 — Swagger polish (non-breaking, v1.x)
+## Phase 3 — Swagger polish (non-breaking, v1.x) ✅ DONE
 
 - `@ApiBody` + dedicated create/update DTOs (stop leaking server-managed fields).
 - Fix `operationId` collisions, createMany/updateMany array types, typed

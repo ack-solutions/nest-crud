@@ -66,4 +66,23 @@ describe('Swagger contract', () => {
         const params = (doc.paths['/users'].get.parameters ?? []).map((p: any) => p.name);
         expect(params).toEqual(expect.arrayContaining(['where', 'relations', 'take', 'withDeleted']));
     });
+
+    it('documents the id path param as a uuid', () => {
+        const params = (doc.paths['/users/{id}'].get.parameters ?? []) as any[];
+        const idParam = params.find((p) => p.name === 'id');
+        expect(idParam).toBeDefined();
+        expect(idParam.schema?.format ?? idParam.format).toBe('uuid');
+    });
+
+    it('create request body omits server-managed fields', () => {
+        const reqSchema: any = doc.paths['/users'].post.requestBody?.['content']?.['application/json']?.schema;
+        expect(reqSchema).toBeDefined();
+        const ref: string | undefined = reqSchema.$ref;
+        const schemaName = ref ? ref.split('/').pop() : undefined;
+        const schema = schemaName ? (doc.components?.schemas as any)?.[schemaName] : reqSchema;
+        const props = Object.keys(schema?.properties ?? {});
+        expect(props).not.toContain('id');
+        expect(props).not.toContain('createdAt');
+        expect(props).not.toContain('deletedAt');
+    });
 });

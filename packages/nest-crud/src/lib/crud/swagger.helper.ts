@@ -509,7 +509,6 @@ export class Swagger {
                                     items: { type: 'object' },
                                     description: 'Array of created/updated items',
                                 },
-                            type: isValidEntityType ? undefined : PaginationResponseDto,
                         },
                     };
                     break;
@@ -617,6 +616,7 @@ export class Swagger {
                 required: true,
                 in: 'path',
                 type: options[param].type === 'number' ? Number : String,
+                format: options[param].type === 'uuid' ? 'uuid' : undefined,
                 enum: options[param].enum ? Object.values(options[param].enum) : undefined,
             }))
             : /* istanbul ignore next */[];

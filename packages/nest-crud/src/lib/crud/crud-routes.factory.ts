@@ -1,4 +1,5 @@
 import { UseGuards } from '@nestjs/common';
+import { OmitType } from '@nestjs/swagger';
 import deepmerge from 'deepmerge';
 
 import {
@@ -674,6 +675,24 @@ export class CrudRoutesFactory {
         R.setRouteArgs(args, this.target, name);
     }
 
+    private writableDto: any;
+
+    /**
+     * Default request-body DTO for create/update: the entity minus server-managed
+     * fields (id, timestamps, soft-delete column) so they are not shown as writable
+     * in Swagger. The service still filters unknown/extra fields at runtime, so a
+     * client that sends them is unaffected.
+     */
+    private getWritableDto() {
+        if (!this.writableDto) {
+            this.writableDto = OmitType(this.entity, ['id', 'createdAt', 'updatedAt', 'deletedAt'] as any);
+            Object.defineProperty(this.writableDto, 'name', {
+                value: `Writable${this.entity?.name || 'Entity'}Dto`,
+            });
+        }
+        return this.writableDto;
+    }
+
     /**
      * Sets TypeScript type metadata for route arguments
      *
@@ -704,7 +723,7 @@ export class CrudRoutesFactory {
                 break;
             }
             case 'create': {
-                const createDto = this.options.dto?.create || this.entity;
+                const createDto = this.options.dto?.create || this.getWritableDto();
                 R.setRouteArgsTypes([createDto], this.targetProto, name);
                 break;
             }
@@ -714,7 +733,7 @@ export class CrudRoutesFactory {
                 break;
             }
             case 'update': {
-                const updateDto = this.options.dto?.update || this.entity;
+                const updateDto = this.options.dto?.update || this.getWritableDto();
                 R.setRouteArgsTypes([String, updateDto], this.targetProto, name);
                 break;
             }
