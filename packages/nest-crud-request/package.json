@@ -8,6 +8,9 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "prepublishOnly": "npm run build"
@@ -44,6 +47,8 @@
   "devDependencies": {
     "typescript": "^5.7.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5"
   }
 }

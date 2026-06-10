@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Get, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Crud } from '@ackplus/nest-crud';
 import { Post } from '../database/entities/post.entity';
@@ -7,15 +7,15 @@ import { PostService } from './post.service';
 @ApiTags('posts')
 @Crud({
   entity: Post,
+  path: 'posts',
   routes: {
-    findMany: true,
-    findOne: true,
-    create: true,
-    update: true,
-    delete: true,
+    findMany: { enabled: true },
+    findOne: { enabled: true },
+    create: { enabled: true },
+    update: { enabled: true },
+    delete: { enabled: true },
   },
 })
-@Controller('posts')
 export class PostController {
   constructor(public service: PostService) {}
 
@@ -39,19 +39,19 @@ export class PostController {
     summary: 'Get posts by author',
     description: 'Returns all posts created by the specified author'
   })
-  @ApiParam({ 
-    name: 'authorId', 
-    description: 'Author ID',
-    type: Number,
-    example: 1
+  @ApiParam({
+    name: 'authorId',
+    description: 'Author ID (User UUID)',
+    type: String,
+    example: '3fa85f64-5717-4562-b3fc-2c963f66afa6'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of posts by the specified author',
     type: [Post]
   })
   async getPostsByAuthor(
-    @Param('authorId', ParseIntPipe) authorId: number,
+    @Param('authorId') authorId: string,
   ): Promise<Post[]> {
     return this.service.findByAuthor(authorId);
   }

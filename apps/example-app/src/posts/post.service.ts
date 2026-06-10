@@ -21,7 +21,7 @@ export class PostService extends CrudService<Post> {
     });
   }
 
-  async findByAuthor(authorId: number): Promise<Post[]> {
+  async findByAuthor(authorId: string): Promise<Post[]> {
     return this.repository.find({
       where: { authorId },
       relations: ['author'],

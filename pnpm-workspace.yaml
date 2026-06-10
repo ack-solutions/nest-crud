@@ -1,3 +1,13 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# These dependencies ship build/postinstall scripts we intentionally don't run:
+# - sqlite3: an optional peer of typeorm; we use the pure-JS sql.js driver instead
+# - @nestjs/core, @scarf/scarf: optional telemetry postinstalls
+# - unrs-resolver: ships prebuilt binaries; native build not needed
+ignoredBuiltDependencies:
+  - "@nestjs/core"
+  - "@scarf/scarf"
+  - sqlite3
+  - unrs-resolver

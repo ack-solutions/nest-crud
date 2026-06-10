@@ -18,9 +18,10 @@ export interface TestModuleOptions {
     imports?: any[];
 }
 
+// sql.js = pure-WASM SQLite: no native build, works on any Node version / CI.
 const dbConfig = {
-    type: 'sqlite',
-    database: ':memory:',
+    type: 'sqljs',
+    autoSave: false,
     entities: [User, Profile, Post, Comment, ProfileAddress, Country],
     synchronize: true,
     logging: ['error', 'warn'],
