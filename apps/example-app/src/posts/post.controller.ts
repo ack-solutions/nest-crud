@@ -1,4 +1,4 @@
-import { Get, Param } from '@nestjs/common';
+import { Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Crud } from '@ackplus/nest-crud';
 import { Post } from '../database/entities/post.entity';
@@ -51,7 +51,7 @@ export class PostController {
     type: [Post]
   })
   async getPostsByAuthor(
-    @Param('authorId') authorId: string,
+    @Param('authorId', ParseUUIDPipe) authorId: string,
   ): Promise<Post[]> {
     return this.service.findByAuthor(authorId);
   }

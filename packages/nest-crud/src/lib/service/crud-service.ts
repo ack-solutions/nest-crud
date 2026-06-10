@@ -504,8 +504,9 @@ export class CrudService<T extends BaseEntity> {
         const queryBuilder = new FindQueryBuilder(this.repository);
 
         const whereWithId = {
+            ...(parsedOptions?.where || {}),
+            // Enforced last so a caller-provided `where.id` can't override the path id.
             id: { $eq: id },
-            ...(parsedOptions?.where || {})
         };
 
         let builder = queryBuilder.build({

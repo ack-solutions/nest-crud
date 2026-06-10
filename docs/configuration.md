@@ -70,7 +70,7 @@ Set defaults for every controller once, at bootstrap:
 import { CrudConfigService } from '@ackplus/nest-crud';
 
 CrudConfigService.load({
-  maxPageSize: 1000,
+  maxPerPage: 1000, // or the legacy `maxPageSize` alias
   // routes: { ... } // override default route config globally
 });
 ```

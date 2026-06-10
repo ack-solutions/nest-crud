@@ -38,7 +38,7 @@ export class User extends BaseEntity {
 }
 ```
 
-> The service assumes the primary key is `id` is provided by `BaseEntity`. If you
+> The service assumes the primary key `id` is provided by `BaseEntity`. If you
 > need an ordered list, extend `BaseEntityWithOrder` instead (adds an `order` column).
 
 ## 3. Create a service
