@@ -191,10 +191,6 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
 
                 this.entityRelationsHash.set(field, toSave);
 
-                if (field) {
-                    this.entityRelationsHash.set(field, toSave);
-                }
-
                 return toSave;
             }
         } catch (_) {

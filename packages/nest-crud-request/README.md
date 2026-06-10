@@ -373,8 +373,6 @@ const stored = qb.toObject(true); // native shape
 const restored = new QueryBuilder(stored);
 ```
 
-More full-app examples (React, Angular, Vue): see [`examples/`](./examples/).
-
 ---
 
 ## Types & enums reference

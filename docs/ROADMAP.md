@@ -18,7 +18,7 @@ well-documented, and safe to upgrade — **without breaking existing users**.
 ## Progress
 
 - [x] **Phase 0 — Stabilize** ✅ (tests run, example works, CI added)
-- [ ] **Phase 1 — Clean the junk**
+- [x] **Phase 1 — Clean the junk** ✅ (dead code, junk files, LICENSE, single publish flow)
 - [ ] **Phase 2 — Tests so updates never break users** (+ non-breaking bug fixes)
 - [ ] **Phase 3 — Swagger polish**
 - [ ] **Phase 4 — Developer documentation**
@@ -57,7 +57,7 @@ green (107 tests).
 
 ---
 
-## Phase 1 — Clean the junk (non-breaking, v1.x)
+## Phase 1 — Clean the junk (non-breaking, v1.x) ✅ DONE
 
 - Reconcile the two barrels — make `packages/nest-crud/src/index.ts` the single
   public entry; delete the dead `src/lib/index.ts`. Additively export power-user

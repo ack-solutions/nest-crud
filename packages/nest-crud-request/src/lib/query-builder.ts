@@ -156,22 +156,18 @@ export class QueryBuilder {
             delete options.relations;
         }
 
-        // Convert order to JSON string if it exists
+        // Convert order to a JSON string unless emitting nested objects
         if (options.order && Object.keys(options.order).length > 0) {
-            if (constrainToNestedObject) {
-                options.order = options.order;
-            } else {
+            if (!constrainToNestedObject) {
                 options.order = JSON.stringify(options.order);
             }
         } else {
             delete options.order;
         }
 
-        // Convert select to JSON string if it exists
+        // Convert select to a JSON string unless emitting nested objects
         if (options.select && options.select.length > 0) {
-            if (constrainToNestedObject) {
-                options.select = options.select;
-            } else {
+            if (!constrainToNestedObject) {
                 options.select = JSON.stringify(options.select);
             }
         } else {

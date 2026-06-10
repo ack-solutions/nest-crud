@@ -10,7 +10,6 @@ import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
 
 import {
     CRUD_OPTIONS_METADATA,
-    CRUD_AUTH_OPTIONS_METADATA,
     CRUD_ACTION_METADATA,
 } from '../constants';
 import { CrudActionsEnum, CrudOptions, RouteOptions } from '../interface/crud';
@@ -108,11 +107,6 @@ export class R {
     static setRouteArgsTypes(metadata: any, target: any, name: string) {
         R.set(PARAMTYPES_METADATA, metadata, target, name);
     }
-
-    static setCrudAuthOptions(metadata: any, target: any) {
-        R.set(CRUD_AUTH_OPTIONS_METADATA, metadata, target);
-    }
-
 
     static getCrudOptions(target: any): CrudOptions {
         return R.get(CRUD_OPTIONS_METADATA, target);

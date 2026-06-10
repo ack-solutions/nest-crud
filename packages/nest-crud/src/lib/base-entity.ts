@@ -31,17 +31,6 @@ export class BaseEntity {
 
 }
 
-// export class BaseEntityWithTrash extends BaseEntity {
-
-//     @DeleteDateColumn()
-//     @ApiProperty({
-//         description: 'The date and time the entity was deleted',
-//         readOnly: true,
-//     })
-//     deletedAt: Date;
-
-// }
-
 export class BaseEntityWithOrder extends BaseEntity {
 
     @Column({ default: 0 })

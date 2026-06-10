@@ -8,8 +8,7 @@
     "nest-crud-request": "pnpm -C packages/nest-crud-request",
     "example": "pnpm -C apps/example-app",
     "build": "pnpm nest-crud-request build && pnpm nest-crud build",
-    "test": "pnpm -r test",
-    "publish": "node scripts/publish.js"
+    "test": "pnpm -r test"
   },
   "keywords": [
     "nestjs",
@@ -22,7 +21,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ackplus/nest-crud"
+    "url": "https://github.com/ack-solutions/nest-crud"
   },
   "packageManager": "pnpm@10.21.0",
   "devDependencies": {

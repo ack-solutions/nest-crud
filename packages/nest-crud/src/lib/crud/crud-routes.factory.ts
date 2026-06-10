@@ -1,4 +1,4 @@
-import { UseGuards, ExecutionContext, CallHandler, NestInterceptor } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import deepmerge from 'deepmerge';
 
 import {
@@ -739,32 +739,11 @@ export class CrudRoutesFactory {
     // ============================================================================
 
     /**
-     * Creates an interceptor that sets the CRUD method name on the request object
-     * This allows other interceptors to access the method name via request.crudMethod
-     *
-     * @param methodName - The CRUD method name (e.g., 'findMany', 'create', etc.)
-     * @returns A NestJS interceptor that sets the method name on the request
-     */
-    // protected createMethodNameInterceptor(methodName: CrudActionsEnum): NestInterceptor {
-    //     return {
-    //         intercept(context: ExecutionContext, next: CallHandler) {
-    //             const request = context.switchToHttp().getRequest();
-    //             // Set the CRUD method name on the request object so other interceptors can access it
-    //             request[CRUD_METHOD_NAME_KEY] = methodName;
-    //             return next.handle();
-    //         },
-    //     };
-    // }
-
-    /**
      * Sets up interceptors for a route
      *
      * Interceptors can be configured per-route or globally.
      * If the route is overridden, existing interceptors are preserved and merged
      * with configured interceptors.
-     *
-     * The method name interceptor is added first so other interceptors can access
-     * the CRUD method name via request.crudMethod
      *
      * @param name - Route name
      */
@@ -772,11 +751,7 @@ export class CrudRoutesFactory {
         const configuredInterceptors = (this.options.routes?.[name] as any)?.interceptors || [];
         const existingInterceptors = R.getInterceptors(this.targetProto[name]) || [];
 
-        // Create the method name interceptor that sets the method on the request
-        // const methodNameInterceptor = this.createMethodNameInterceptor(name);
-
-        // Merge interceptors: method name interceptor first, then existing, then configured
-        // Method name interceptor must be first so other interceptors can access it
+        // Merge interceptors from an overridden handler with the configured ones
         const allInterceptors = [
             ...(isArrayFull(existingInterceptors) ? existingInterceptors : []),
             ...(isArrayFull(configuredInterceptors) ? configuredInterceptors : []),
