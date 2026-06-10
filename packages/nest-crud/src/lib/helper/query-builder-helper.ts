@@ -209,9 +209,14 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         if (!field || typeof field !== 'string') {
             return false;
         }
+        // Accept any known column first — this also covers embedded-column paths
+        // such as 'name.first' (stored in entityColumns as a dotted propertyPath).
+        if (this.entityColumns.includes(field)) {
+            return true;
+        }
         const parts = field.split('.');
         if (parts.length === 1) {
-            return this.entityColumns.includes(field);
+            return false;
         }
         let metadata = this.repository.metadata;
         for (let i = 0; i < parts.length - 1; i++) {
