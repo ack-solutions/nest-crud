@@ -19,7 +19,10 @@ well-documented, and safe to upgrade — **without breaking existing users**.
 
 - [x] **Phase 0 — Stabilize** ✅ (tests run, example works, CI added)
 - [x] **Phase 1 — Clean the junk** ✅ (dead code, junk files, LICENSE, single publish flow)
-- [ ] **Phase 2 — Tests so updates never break users** (+ non-breaking bug fixes)
+- [x] **Phase 2 — Tests + non-breaking bug fixes** ✅ — HTTP route harness + full coverage,
+  9 bug fixes (route ordering, boolean routes, beforeFindOne, counts PK, createMany reload,
+  400-not-500, reorder transaction, maxPerPage, withDeleted/onlyDeleted validation), `where`-key
+  hardening, soft-delete/guards/interceptors/hooks/Swagger-contract coverage. **156 tests, ~86% lines, CI-gated.**
 - [ ] **Phase 3 — Swagger polish**
 - [ ] **Phase 4 — Developer documentation**
 - [ ] **Phase 5 — v2.0 breaking polish** (+ migration guide)
@@ -74,7 +77,7 @@ green (107 tests).
 - Delete the stale `examples/{vue,angular,react}` snippets and empty stub READMEs
   (replaced by correct guides in Phase 4).
 
-## Phase 2 — Tests so updates never break users (non-breaking, v1.x)
+## Phase 2 — Tests so updates never break users (non-breaking, v1.x) ✅ DONE
 
 Lands the **non-breaking bug fixes** (each with a regression test).
 

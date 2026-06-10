@@ -1,12 +1,11 @@
 import { ValidationPipe, ValidationPipeOptions } from '@nestjs/common';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { isNil } from 'lodash';
 
-import { DEFAULT_MAX_PER_PAGE } from '../constants';
 import { CrudOptions, CrudValidationGroupsEnum } from '../interface/crud';
-import { CrudConfigService } from '../service/crud-config.service';
+import { resolveMaxPerPage } from '../helper/pagination-limit';
 import { isFalse } from '../utils';
 import { WhereOptions } from '../types';
 
@@ -123,6 +122,7 @@ class ManyConditionDto {
         type: Boolean
     })
     @IsOptional()
+    @Transform(({ value }) => (value === undefined ? undefined : value === true || value === 'true' || value === '1'))
     @IsBoolean()
     onlyDeleted?: boolean;
 
@@ -133,6 +133,7 @@ class ManyConditionDto {
         type: Boolean
     })
     @IsOptional()
+    @Transform(({ value }) => (value === undefined ? undefined : value === true || value === 'true' || value === '1'))
     @IsBoolean()
     withDeleted?: boolean;
 }
@@ -152,10 +153,9 @@ export class Validation {
         /* istanbul ignore else */
 
         if (!isFalse(options.validation)) {
-            const maxPerPage =
-                options.maxPerPage ??
-                CrudConfigService.config.maxPerPage ??
-                DEFAULT_MAX_PER_PAGE;
+            // Resolve from @Crud / CrudConfigService, honouring both `maxPerPage`
+            // and the legacy `maxPageSize`, so the Swagger @Max reflects the real cap.
+            const maxPerPage = resolveMaxPerPage(options);
 
             class FindManyImpl extends ManyConditionDto {
 

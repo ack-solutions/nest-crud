@@ -6,6 +6,7 @@ import { createCrudTestApp } from '../helper/testing-module';
 import { seedTestData } from '../helper/seed-data';
 import { User } from '../helper/entities/user-test.entity';
 import { CrudService } from '../../lib/service/crud-service';
+import { OrderedItem } from '../helper/entities/ordered-item-test.entity';
 
 describe('CrudService / factory bug fixes', () => {
     describe('boolean route shorthand', () => {
@@ -99,6 +100,46 @@ describe('CrudService / factory bug fixes', () => {
             const scoped = new ScopedService(repo);
 
             await expect(scoped.findOne(existing!.id)).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('reorder() updates order fields atomically', async () => {
+            const repo = dataSource.getRepository(OrderedItem);
+            const a = await repo.save(repo.create({ name: 'a' }));
+            const b = await repo.save(repo.create({ name: 'b' }));
+            const c = await repo.save(repo.create({ name: 'c' }));
+
+            const service = new CrudService(repo);
+            await service.reorder([c.id, a.id, b.id]);
+
+            const byId = Object.fromEntries((await repo.find()).map((i) => [i.id, i.order]));
+            expect(byId[c.id]).toBe(0);
+            expect(byId[a.id]).toBe(1);
+            expect(byId[b.id]).toBe(2);
+        });
+    });
+
+    describe('maxPerPage cap', () => {
+        let app: INestApplication;
+
+        beforeAll(async () => {
+            app = await createCrudTestApp({
+                entity: User,
+                path: 'users',
+                maxPerPage: 5,
+                routes: { findMany: { enabled: true } },
+            });
+        });
+
+        afterAll(async () => {
+            await app.close();
+        });
+
+        it('rejects take above the configured maxPerPage', async () => {
+            await request(app.getHttpServer()).get('/users').query({ take: 10 }).expect(400);
+        });
+
+        it('allows take within the configured maxPerPage', async () => {
+            await request(app.getHttpServer()).get('/users').query({ take: 5 }).expect(200);
         });
     });
 });

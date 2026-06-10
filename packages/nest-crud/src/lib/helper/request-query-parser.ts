@@ -39,11 +39,14 @@ export class RequestQueryParser {
             delete parsedQuery.skip;
         }
 
-        // Handle soft delete options
+        // Handle soft delete options (independent flags; strip from the leftover query)
         if (parsedQuery.withDeleted !== undefined) {
             options.withDeleted = this.parseBoolean(parsedQuery.withDeleted);
-        } else if (parsedQuery.onlyDeleted !== undefined) {
+            delete parsedQuery.withDeleted;
+        }
+        if (parsedQuery.onlyDeleted !== undefined) {
             options.onlyDeleted = this.parseBoolean(parsedQuery.onlyDeleted);
+            delete parsedQuery.onlyDeleted;
         }
 
         // Handle JSON-serialized parameters with security validation

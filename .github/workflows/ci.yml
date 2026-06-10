@@ -31,8 +31,8 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Unit tests (all packages)
-        run: pnpm -r test
+      - name: Unit tests + coverage (all packages)
+        run: pnpm -r test:cov
 
       - name: E2E tests (example app)
         run: pnpm -C apps/example-app test:e2e

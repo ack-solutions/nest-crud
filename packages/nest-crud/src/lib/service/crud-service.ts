@@ -790,9 +790,12 @@ export class CrudService<T extends BaseEntity> {
      * - Writes \(N\) updates (one per id).
      */
     async reorder(order: ID[], ..._others: any[]) {
-        for (let i = 0; i < order.length; i++) {
-            await this.repository.update(order[i], { order: i } as any);
-        }
+        // Wrap in a transaction so a partial reorder is never committed on failure.
+        await this.repository.manager.transaction(async (manager) => {
+            for (let i = 0; i < order.length; i++) {
+                await manager.update(this.repository.target, order[i] as any, { order: i } as any);
+            }
+        });
     }
 
     /**

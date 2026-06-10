@@ -18,4 +18,8 @@ module.exports = {
     '!src/tests/**',
     '!src/test/**',
   ],
+  // Conservative floor — a catastrophic-regression guard, not a strict target.
+  coverageThreshold: {
+    global: { statements: 75, branches: 55, functions: 70, lines: 75 },
+  },
 };
