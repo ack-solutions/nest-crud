@@ -638,6 +638,7 @@ export class CrudService<T extends BaseEntity> {
 
         await this.afterDelete(oldData);
         return {
+            success: true,
             message: 'Successfully deleted',
         };
     }
@@ -654,6 +655,7 @@ export class CrudService<T extends BaseEntity> {
     async deleteMany(params: IDeleteManyOptions, softDelete?: boolean, ..._others: any) {
         if (!params.ids || params.ids.length === 0) {
             return {
+                success: true,
                 message: 'No items to delete',
             };
         }
@@ -666,10 +668,12 @@ export class CrudService<T extends BaseEntity> {
             }
             await this.afterDeleteMany(ids);
             return {
+                success: true,
                 message: 'Successfully deleted',
             };
         }
         return {
+            success: true,
             message: 'No items to delete',
         };
     }
@@ -797,6 +801,10 @@ export class CrudService<T extends BaseEntity> {
                 await manager.update(this.repository.target, order[i] as any, { order: i } as any);
             }
         });
+        return {
+            success: true,
+            message: 'Successfully reordered',
+        };
     }
 
     /**

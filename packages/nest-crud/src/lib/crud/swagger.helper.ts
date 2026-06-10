@@ -515,8 +515,7 @@ export class Swagger {
 
                 case CrudActionsEnum.DELETE:
                 case CrudActionsEnum.DELETE_MANY:
-                    // delete and deleteMany return { message: string }
-                    // Use reusable MessageResponseDto schema reference
+                    // delete and deleteMany return { success: true, message: string }
                     const deleteMessages = {
                         [CrudActionsEnum.DELETE]: 'Successfully deleted the item',
                         [CrudActionsEnum.DELETE_MANY]: 'Delete operation completed',
@@ -524,23 +523,23 @@ export class Swagger {
                     successResponse = {
                         [HttpStatus.OK]: {
                             description: deleteMessages[name],
-                            schema: getSchemaPath ? { $ref: getSchemaPath(MessageResponseDto) } : undefined,
-                            type: MessageResponseDto,
+                            schema: getSchemaPath ? { $ref: getSchemaPath(SuccessMessageResponseDto) } : undefined,
+                            type: SuccessMessageResponseDto,
                             ...(name === CrudActionsEnum.DELETE_MANY ? {
                                 examples: {
                                     'Success': {
                                         summary: 'Items deleted successfully',
                                         description: 'Response when items were deleted',
-                                        value: { message: 'Successfully deleted' },
+                                        value: { success: true, message: 'Successfully deleted' },
                                     },
                                     'No Items': {
                                         summary: 'No items to delete',
                                         description: 'Response when no items matched the delete criteria',
-                                        value: { message: 'No items to delete' },
+                                        value: { success: true, message: 'No items to delete' },
                                     },
                                 },
                             } : {
-                                example: { message: 'Successfully deleted' },
+                                example: { success: true, message: 'Successfully deleted' },
                             }),
                         },
                     };
@@ -578,15 +577,13 @@ export class Swagger {
                     break;
 
                 case CrudActionsEnum.REORDER:
-                    // reorder returns void (undefined)
+                    // reorder returns { success: true, message: string }
                     successResponse = {
                         [HttpStatus.OK]: {
                             description: 'Successfully reordered items',
-                            schema: {
-                                type: 'object',
-                                description: 'Empty response body',
-                                properties: {},
-                            },
+                            schema: getSchemaPath ? { $ref: getSchemaPath(SuccessMessageResponseDto) } : undefined,
+                            type: SuccessMessageResponseDto,
+                            example: { success: true, message: 'Successfully reordered' },
                         },
                     };
                     break;

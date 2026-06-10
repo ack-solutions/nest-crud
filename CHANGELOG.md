@@ -4,7 +4,23 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] — unreleased (v2 track)
+
+Breaking — see [MIGRATION.md](./MIGRATION.md). Includes everything below plus:
+
+### Changed (breaking)
+
+- Mutation endpoints now share a unified `{ success, message }` response.
+  `delete` / `deleteMany` gain a `success: true` field; `reorder` now returns a
+  body (it previously returned none).
+
+### Removed
+
+- The unused `CRUD_AUTH_OPTIONS_METADATA` export.
+
+---
+
+## [1.2.0] — unreleased (v1.x track)
 
 A non-breaking hardening, testing, and documentation release. Existing apps
 upgrade with no code changes.
