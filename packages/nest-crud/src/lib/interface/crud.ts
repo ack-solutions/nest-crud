@@ -27,6 +27,17 @@ export interface CrudQueryOptions {
     relations?: string[];
 }
 
+/**
+ * Customisable response messages (i18n). Any omitted key falls back to the
+ * English default. Set globally via `CrudConfigService.load({ messages })`.
+ */
+export interface CrudMessages {
+    deleted?: string;
+    noItemsToDelete?: string;
+    restored?: string;
+    reordered?: string;
+}
+
 export interface CrudOptions {
     debug?: boolean;
     name?: string;
@@ -43,6 +54,8 @@ export interface CrudOptions {
     entity: any;
     routes?: Partial<CrudRoutesOptions>;
     softDelete?: boolean;
+    /** Override delete/restore/reorder response messages (i18n). */
+    messages?: CrudMessages;
     validation?: ValidationPipeOptions;
     dto?: {
         create?: any;

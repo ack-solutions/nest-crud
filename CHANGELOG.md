@@ -8,6 +8,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 Breaking — see [MIGRATION.md](./MIGRATION.md). Includes everything below plus:
 
+### Added
+
+- Configurable / i18n response messages via `CrudConfigService.load({ messages })`
+  (delete / restore / reorder; omitted keys keep the English default).
+
 ### Changed (breaking)
 
 - Mutation endpoints now share a unified `{ success, message }` response.

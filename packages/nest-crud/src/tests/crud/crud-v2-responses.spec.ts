@@ -6,6 +6,7 @@ import { createCrudTestApp } from '../helper/testing-module';
 import { User } from '../helper/entities/user-test.entity';
 import { OrderedItem } from '../helper/entities/ordered-item-test.entity';
 import { CrudService } from '../../lib/service/crud-service';
+import { CrudConfigService } from '../../lib/service/crud-config.service';
 
 /**
  * v2 — every mutation response uses the unified `{ success, message }` shape.
@@ -51,5 +52,16 @@ describe('v2 unified response shapes', () => {
         const item = await repo.save(repo.create({ name: 'a' }));
         const result = await new CrudService(repo).reorder([item.id]);
         expect(result).toEqual({ success: true, message: expect.any(String) });
+    });
+
+    it('honours a global message override (i18n)', async () => {
+        CrudConfigService.config.messages = { deleted: 'Eliminado' };
+        try {
+            const user = (await http().post('/users').send({ name: 'x' }).expect(201)).body;
+            const res = await http().delete(`/users/${user.id}`).expect(200);
+            expect(res.body.message).toBe('Eliminado');
+        } finally {
+            delete CrudConfigService.config.messages;
+        }
     });
 });

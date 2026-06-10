@@ -7,8 +7,9 @@ import { BaseEntity } from '../base-entity';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
+import { CrudMessages, CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
+import { CrudConfigService } from './crud-config.service';
 
 
 export class CrudService<T extends BaseEntity> {
@@ -16,6 +17,14 @@ export class CrudService<T extends BaseEntity> {
     options: CrudOptions;
 
     constructor(readonly repository: Repository<T>) { }
+
+    /**
+     * Resolve a response message, allowing a global override via
+     * `CrudConfigService.load({ messages })`. Falls back to the English default.
+     */
+    protected msg(key: keyof CrudMessages, fallback: string): string {
+        return CrudConfigService.config.messages?.[key] ?? fallback;
+    }
 
     /**
      * Hook that runs before `create()` and `update()` persist data.
@@ -639,7 +648,7 @@ export class CrudService<T extends BaseEntity> {
         await this.afterDelete(oldData);
         return {
             success: true,
-            message: 'Successfully deleted',
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -656,7 +665,7 @@ export class CrudService<T extends BaseEntity> {
         if (!params.ids || params.ids.length === 0) {
             return {
                 success: true,
-                message: 'No items to delete',
+                message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
         const ids = await this.beforeDeleteMany(params.ids);
@@ -669,12 +678,12 @@ export class CrudService<T extends BaseEntity> {
             await this.afterDeleteMany(ids);
             return {
                 success: true,
-                message: 'Successfully deleted',
+                message: this.msg('deleted', 'Successfully deleted'),
             };
         }
         return {
             success: true,
-            message: 'No items to delete',
+            message: this.msg('noItemsToDelete', 'No items to delete'),
         };
     }
 
@@ -705,7 +714,7 @@ export class CrudService<T extends BaseEntity> {
         await this.afterDeleteFromTrash(oldData);
         return {
             success: true,
-            message: 'Successfully deleted',
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -719,7 +728,7 @@ export class CrudService<T extends BaseEntity> {
         if (!params.ids || params.ids.length === 0) {
             return {
                 success: true,
-                message: 'No items to delete',
+                message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
         const ids = await this.beforeDeleteFromTrashMany(params.ids);
@@ -729,7 +738,7 @@ export class CrudService<T extends BaseEntity> {
         }
         return {
             success: true,
-            message: 'Successfully deleted',
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -760,7 +769,7 @@ export class CrudService<T extends BaseEntity> {
         await this.afterRestore(oldData);
         return {
             success: true,
-            message: 'Successfully restored',
+            message: this.msg('restored', 'Successfully restored'),
         };
     }
 
@@ -780,7 +789,7 @@ export class CrudService<T extends BaseEntity> {
         }
         return {
             success: true,
-            message: 'Successfully restored',
+            message: this.msg('restored', 'Successfully restored'),
         };
     }
 
@@ -803,7 +812,7 @@ export class CrudService<T extends BaseEntity> {
         });
         return {
             success: true,
-            message: 'Successfully reordered',
+            message: this.msg('reordered', 'Successfully reordered'),
         };
     }
 

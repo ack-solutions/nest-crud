@@ -39,14 +39,28 @@ The query format, generated routes, `@Crud()` options, lifecycle hooks, entity
 base classes, and the `@ackplus/nest-crud-request` client are all identical to
 v1.2.x.
 
-## Planned for later v2.x (not in this release)
+## New in v2 (non-breaking additions)
 
-These are tracked for future v2.x releases and will be documented here as they land:
+- **Configurable response messages (i18n).** Override the delete / restore /
+  reorder messages globally; omitted keys keep the English default:
+  ```ts
+  CrudConfigService.load({
+    messages: { deleted: 'Eliminado', restored: 'Restaurado', reordered: 'Reordenado' },
+  });
+  ```
+
+## Already supported — no change needed
+
+- **Custom / extra routes.** Add standard NestJS route methods (`@Get`, `@Post`, …)
+  to your `@Crud` controller; they coexist with the generated routes, and the
+  factory registers generated routes *after* your custom ones, so a custom
+  `@Get('active')` is never shadowed by `GET /:id`.
+
+## Planned for later v2.x
 
 - Normalized lifecycle-hook signatures (consistent `request` / transaction args).
-- `this.options` available inside `CrudService`.
-- Custom-route registration through `@Crud()`.
-- Configurable / i18n response messages.
+- `this.options` available inside `CrudService` (deferred — needs request scoping
+  to remain safe with singleton service instances).
 
 ## Upgrading
 
