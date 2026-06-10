@@ -14,6 +14,10 @@ Guides for `@ackplus/nest-crud` (backend) and `@ackplus/nest-crud-request` (clie
 - [Soft delete](./soft-delete.md) — trash & restore.
 - [Auth & guards](./auth-and-guards.md) — protect routes, `getAction()`.
 
+## Client frameworks
+
+- [React](./frameworks/react.md) · [Angular](./frameworks/angular.md) · [Vue](./frameworks/vue.md) — build queries with `@ackplus/nest-crud-request`.
+
 ## Reference
 
 - [Error handling](./error-handling.md) — status codes and shapes.

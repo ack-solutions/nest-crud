@@ -2,7 +2,7 @@
 
 All list endpoints (`findMany`, `findAll`, `counts`) accept the same query
 parameters. Each can be sent as a **JSON string** (recommended) or as bracket /
-dot notation. The client builder [`@ackplus/nest-crud-request`](../packages/nest-crud-request/README.md)
+dot notation. The client builder [`@ackplus/nest-crud-request`](https://github.com/ack-solutions/nest-crud/tree/main/packages/nest-crud-request)
 produces exactly this format.
 
 ```
