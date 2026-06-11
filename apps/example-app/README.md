@@ -5,17 +5,23 @@ against seeded data, so you can try things immediately in **Swagger** or **Postm
 
 ## Run it
 
+Uses **real Postgres**, configured once in `.env`.
+
 ```bash
 # from the repo root (builds the libraries first)
 pnpm install
 pnpm -C packages/nest-crud build
 
-# start the example (in-memory SQLite, seeds on boot)
+# point it at your Postgres (set credentials once)
+cp apps/example-app/.env.example apps/example-app/.env   # then edit DB_* / DATABASE_URL
+createdb nest_crud_example                                # or use a database you already have
+
+# start the example (creates tables + seeds on boot)
 pnpm -C apps/example-app start          # or: start:dev for watch mode
 ```
 
 - API: <http://localhost:3000>  ·  Swagger UI: <http://localhost:3000/api>
-- Change the port with `PORT=3100`. Persist data with `DATABASE_PATH=./db.sqlite`.
+- Change the port with `PORT=3100`.
 
 Every list endpoint documents its query params (`where`, `relations`, `order`,
 `select`, `aggregates`, `having`, `take`, `skip`, `withDeleted`, `onlyDeleted`)
@@ -139,54 +145,29 @@ const params = new QueryBuilder()
 await axios.get('/users', { params });
 ```
 
-## Tests
+## End-to-end tests (real Postgres)
+
+With your `.env` set up (same one the app uses), one command runs everything:
 
 ```bash
-# smoke e2e over in-memory SQLite (always runs, no setup)
+pnpm -C packages/nest-crud build        # build the lib once
 pnpm -C apps/example-app test:e2e
 ```
 
-### End-to-end against real Postgres
+Two suites run against your Postgres (each TRUNCATEs only its own tables):
 
-`test/postgres.e2e-spec.ts` exercises the full stack on a real Postgres DB —
-create (via bulk), find, filter, operators (`$iLike` / `$isTrue` / `$isFalse`),
-nested relations, aggregates + having, counts, hidden field/relation rejection,
-update, **soft-delete → trash → restore**, **bulk** update/delete, and **reorder**.
+- **`test/postgres.e2e-spec.ts`** — the full stack: create (via bulk), find,
+  filter, operators (`$iLike` / `$isTrue` / `$isFalse`), nested relations,
+  aggregates + having (incl. per-aggregate `where`), counts, hidden field/relation
+  rejection, update, **soft-delete → trash → restore**, **bulk** update/delete,
+  and **reorder**.
+- **`test/query-builder.e2e-spec.ts`** — **complex, multi-feature** requests built
+  with the client [`QueryBuilder`](../../packages/nest-crud-request): filter +
+  search + sort + pagination, grouped AND/OR + select + relations + aggregates +
+  having — validating the whole `builder → query string → server → DB` round-trip.
 
-`test/query-builder.e2e-spec.ts` goes further: each test builds a **complex,
-multi-feature** request with the client [`QueryBuilder`](../../packages/nest-crud-request)
-(`@ackplus/nest-crud-request`) — filter + search + sort + pagination, grouped
-AND/OR + select + relations + aggregates + having — and runs it against Postgres,
-validating the whole `builder → query string → server → DB` round-trip.
-
-It is **opt-in** — it only runs when a Postgres target is configured (otherwise
-it's skipped), so it never breaks machines/CI without a database. It creates and
-TRUNCATEs only its own tables. No more typing a long env-var prefix every time —
-pick one of:
-
-**A. One command (Docker)** — spins up Postgres (bundled `docker-compose.yml`) and
-runs everything:
-
-```bash
-pnpm -C apps/example-app test:e2e:pg
-```
-
-**B. Your own Postgres** — set credentials once in `.env`, then just `test:e2e`:
-
-```bash
-cp apps/example-app/.env.example apps/example-app/.env   # edit creds if needed
-pnpm -C apps/example-app test:e2e
-```
-
-Manage the bundled database:
-
-```bash
-pnpm -C apps/example-app db:up      # start Postgres (waits until healthy)
-pnpm -C apps/example-app db:down    # stop it
-pnpm -C apps/example-app db:reset   # wipe the volume + restart fresh
-```
-
-(You can still pass vars inline — `DB_HOST=… DB_PORT=… pnpm -C apps/example-app test:e2e`
-— or a single `DATABASE_URL`; inline values win over `.env`.)
+The suites are **opt-in**: if no Postgres is configured (no `.env` / DB env), they
+`describe.skip` so CI without a database isn't broken. Inline env wins over `.env`
+(`DB_HOST=… DB_PORT=… pnpm test:e2e`), and a single `DATABASE_URL` also works.
 
 See the [docs site](https://ack-solutions.github.io/nest-crud/) for the full guide.
