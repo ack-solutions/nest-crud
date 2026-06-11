@@ -8,12 +8,18 @@ import { PostService } from './post.service';
 @Crud({
   entity: Post,
   path: 'posts',
+  // `internalNotes` is hidden on the entity via @CrudHidden().
   routes: {
     findMany: { enabled: true },
+    findAll: { enabled: true },
+    counts: { enabled: true },
     findOne: { enabled: true },
     create: { enabled: true },
+    createMany: { enabled: true },
     update: { enabled: true },
+    updateMany: { enabled: true },
     delete: { enabled: true },
+    deleteMany: { enabled: true },
   },
 })
 export class PostController {

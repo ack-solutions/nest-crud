@@ -39,6 +39,12 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
 
 ### Changed
 
+- Swagger: the generated list endpoints now document the `aggregates` and `having`
+  query parameters (with examples) alongside the existing `where` / `relations` /
+  `order` / `select` / pagination / soft-delete params.
+- The `apps/example-app` is now a full feature demo — User / Profile / Post /
+  Comment with 1:1, 1:n and nested relations, hidden column + hidden relation,
+  soft-delete, and seed data on boot — so every feature is testable from Swagger.
 - An explicit `select` now always includes the entity's primary key, so nested
   relations hydrate and entity identity is preserved when `select` omits the id.
 - The 23-operator `where` builder was refactored to a registry (behaviour and

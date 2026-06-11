@@ -326,6 +326,58 @@ export class Validation {
                 @IsOptional()
                 select?: string[] | string;
 
+                @ApiPropertyOptional({
+                    description: `Per-row aggregates over a relation (count/sum/avg/min/max), attached to each returned row. Array of \`{ fn, field, as }\` (field is relation-qualified, e.g. \`posts.id\`; \`as\` is the alias used by \`having\`/\`order\`). ${docsLink('aggregates')}`,
+                    examples: {
+                        count: {
+                            summary: 'Count related rows',
+                            description: 'Attach a count of a relation to each row',
+                            value: [{ fn: 'count', field: 'posts.id', as: 'postCount' }],
+                        },
+                        multiple: {
+                            summary: 'Several aggregates',
+                            description: 'count + sum over a relation',
+                            value: [
+                                { fn: 'count', field: 'posts.id', as: 'postCount' },
+                                { fn: 'sum', field: 'posts.likes', as: 'totalLikes' },
+                            ],
+                        },
+                        jsonString: {
+                            summary: 'JSON string format',
+                            description: 'Aggregates as a JSON string',
+                            value: '[{"fn":"count","field":"posts.id","as":"postCount"}]',
+                        },
+                    },
+                    oneOf: [
+                        { type: 'string', description: 'JSON string of aggregate specs', example: '[{"fn":"count","field":"posts.id","as":"postCount"}]' },
+                        { type: 'array', items: { type: 'object' }, description: 'Array of { fn, field, as }', example: [{ fn: 'count', field: 'posts.id', as: 'postCount' }] },
+                    ],
+                })
+                @IsOptional()
+                aggregates?: any[] | string;
+
+                @ApiPropertyOptional({
+                    description: `Filter on aggregate aliases — same operator syntax as \`where\` (e.g. \`{ "postCount": { "$gt": 1 } }\`). ${docsLink('aggregates')}`,
+                    examples: {
+                        gt: {
+                            summary: 'Alias greater-than',
+                            description: 'Keep rows whose aggregate exceeds a value',
+                            value: { postCount: { $gt: 1 } },
+                        },
+                        jsonString: {
+                            summary: 'JSON string format',
+                            description: 'Having as a JSON string',
+                            value: '{"postCount":{"$gt":1}}',
+                        },
+                    },
+                    oneOf: [
+                        { type: 'string', description: 'JSON string of having conditions', example: '{"postCount":{"$gt":1}}' },
+                        { type: 'object', description: 'Conditions keyed by aggregate alias', additionalProperties: true, example: { postCount: { $gt: 1 } } },
+                    ],
+                })
+                @IsOptional()
+                having?: Record<string, any> | string;
+
             }
             Object.defineProperty(FindManyImpl, 'name', {
                 writable: false,
