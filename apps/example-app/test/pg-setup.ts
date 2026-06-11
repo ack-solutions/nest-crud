@@ -1,7 +1,14 @@
+import { join } from 'path';
+import { config as loadEnv } from 'dotenv';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+
+// Load apps/example-app/.env so DB credentials can be set once in a file instead
+// of typed on every run. dotenv does not override variables already in the
+// environment, so an inline `DB_HOST=… pnpm test:e2e` still wins.
+loadEnv({ path: join(__dirname, '..', '.env') });
 
 import { User } from '../src/database/entities/user.entity';
 import { Post } from '../src/database/entities/post.entity';

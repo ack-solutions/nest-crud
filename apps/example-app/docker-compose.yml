@@ -1,0 +1,24 @@
+# Local Postgres for the e2e tests. Credentials match .env.example, so:
+#   pnpm db:up          # start it (waits until healthy)
+#   pnpm test:e2e:pg    # start it + run the e2e
+#   pnpm db:down        # stop it   (add -v to also drop the data volume)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nest-crud-example-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nest_crud_e2e
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d nest_crud_e2e']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - nest_crud_pgdata:/var/lib/postgresql/data
+
+volumes:
+  nest_crud_pgdata:

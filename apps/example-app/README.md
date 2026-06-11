@@ -160,22 +160,33 @@ AND/OR + select + relations + aggregates + having — and runs it against Postgr
 validating the whole `builder → query string → server → DB` round-trip.
 
 It is **opt-in** — it only runs when a Postgres target is configured (otherwise
-it's skipped), so it never breaks machines/CI without a database. Point it at any
-Postgres via env vars (or `DATABASE_URL`); it creates and TRUNCATEs only its own
-tables.
+it's skipped), so it never breaks machines/CI without a database. It creates and
+TRUNCATEs only its own tables. No more typing a long env-var prefix every time —
+pick one of:
+
+**A. One command (Docker)** — spins up Postgres (bundled `docker-compose.yml`) and
+runs everything:
 
 ```bash
-# 1. a throwaway Postgres (or use your own)
-docker run -d --name pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=nest_crud_e2e -p 5432:5432 postgres:16-alpine
-
-# 2. build the lib, then run the e2e against it
-pnpm -C packages/nest-crud build
-DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=nest_crud_e2e \
-  pnpm -C apps/example-app test:e2e
-
-# (or a single connection string)
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/nest_crud_e2e \
-  pnpm -C apps/example-app test:e2e
+pnpm -C apps/example-app test:e2e:pg
 ```
+
+**B. Your own Postgres** — set credentials once in `.env`, then just `test:e2e`:
+
+```bash
+cp apps/example-app/.env.example apps/example-app/.env   # edit creds if needed
+pnpm -C apps/example-app test:e2e
+```
+
+Manage the bundled database:
+
+```bash
+pnpm -C apps/example-app db:up      # start Postgres (waits until healthy)
+pnpm -C apps/example-app db:down    # stop it
+pnpm -C apps/example-app db:reset   # wipe the volume + restart fresh
+```
+
+(You can still pass vars inline — `DB_HOST=… DB_PORT=… pnpm -C apps/example-app test:e2e`
+— or a single `DATABASE_URL`; inline values win over `.env`.)
 
 See the [docs site](https://ack-solutions.github.io/nest-crud/) for the full guide.
