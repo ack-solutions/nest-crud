@@ -21,7 +21,7 @@ for (const candidate of [
     join(process.cwd(), '.env'),                     // current working directory
 ]) {
     if (existsSync(candidate)) {
-        loadEnv({ path: candidate });
+        loadEnv({ path: candidate, quiet: true });
     }
 }
 

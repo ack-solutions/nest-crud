@@ -28,7 +28,11 @@ export const describePg = hasPgTarget ? describe : describe.skip;
 export async function bootstrapPgApp(): Promise<{ app: INestApplication; ds: DataSource }> {
   const moduleRef: TestingModule = await Test.createTestingModule({
     imports: [
-      TypeOrmModule.forRoot(typeOrmOptions()),
+      // `dropSchema` gives every e2e run a clean schema, so leftover tables/data
+      // from `pnpm start` or an older schema can't break the tests. (Test-only —
+      // the demo app's connection does not drop.) Point the e2e at a database you
+      // are happy to reset, e.g. `nest_crud_e2e`.
+      TypeOrmModule.forRoot({ ...typeOrmOptions(), dropSchema: true }),
       UserModule,
       PostModule,
       ProfileModule,
