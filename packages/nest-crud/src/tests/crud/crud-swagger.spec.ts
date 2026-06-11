@@ -79,6 +79,15 @@ describe('Swagger contract', () => {
         expect(where.examples ?? where.example ?? where.schema?.example).toBeTruthy();
         const aggregates = allParams.find((p) => p.name === 'aggregates');
         expect(aggregates.examples ?? aggregates.example ?? aggregates.schema?.example).toBeTruthy();
+
+        // JSON-encoded params must be documented as `type: string`, NOT object/array —
+        // otherwise Swagger UI's "Try it out" rejects the value with "must be valid JSON".
+        for (const name of ['where', 'relations', 'order', 'select', 'aggregates', 'having']) {
+            const p = allParams.find((x) => x.name === name);
+            const schema = p.schema ?? {};
+            expect(schema.type).toBe('string');
+            expect(schema.oneOf ?? schema.anyOf).toBeUndefined();
+        }
     });
 
     it('documents the id path param as a uuid', () => {

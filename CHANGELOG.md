@@ -42,6 +42,13 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
 - Swagger: the generated list endpoints now document the `aggregates` and `having`
   query parameters (with examples) alongside the existing `where` / `relations` /
   `order` / `select` / pagination / soft-delete params.
+- Swagger usability: JSON-encoded query params (`where`, `relations`, `order`,
+  `select`, `aggregates`, `having`, counts `filter`) are now documented as
+  `type: string` with **JSON-string** examples derived from the **real entity**
+  columns / relations (hidden ones excluded). Previously they used `oneOf`
+  string/object schemas with object examples, which made Swagger UI's "Try it out"
+  reject the value with "Parameter string value must be valid JSON" and show
+  field names that didn't match the entity. Every example now submits as-is.
 - The `apps/example-app` is now a full feature demo — User / Profile / Post /
   Comment with 1:1, 1:n and nested relations, hidden column + hidden relation,
   soft-delete, and seed data on boot — so every feature is testable from Swagger.
