@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { EntityMetadata, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import { normalizeColumnName } from '../utils';
 import { AggregateSpec } from '../types';
+import { getHiddenFields } from '../decorator/crud-hidden.decorator';
 
 /**
  * Shared helper class for query builders to handle common entity metadata,
@@ -17,6 +18,9 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
     public readonly entityColumnsHash: ObjectLiteral = {};
     public readonly entityHasDeleteColumn: boolean;
 
+    /** Hidden columns/relations on the root entity (`@CrudHidden()` / `hiddenFields`). */
+    public readonly hiddenRootFields: Set<string>;
+
     protected readonly entityRelationsHash: Map<string, any> = new Map();
 
     constructor(
@@ -30,6 +34,7 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         this.entityColumns = this.initializeEntityColumns();
         this.entityPrimaryColumns = this.initializePrimaryColumns();
         this.entityHasDeleteColumn = this.initializeDeleteColumn();
+        this.hiddenRootFields = getHiddenFields(this.repository.metadata.target);
     }
 
     /**
@@ -211,6 +216,11 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         if (!field || typeof field !== 'string') {
             return false;
         }
+        // Hidden columns/relations are treated as if they do not exist, so a request
+        // that references one is rejected exactly like an unknown field (no leak).
+        if (this.isHiddenField(field)) {
+            return false;
+        }
         // Accept any known column first — this also covers embedded-column paths
         // such as 'name.first' (stored in entityColumns as a dotted propertyPath).
         if (this.entityColumns.includes(field)) {
@@ -230,6 +240,58 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         }
         const last = parts[parts.length - 1];
         return metadata.columns.some((col) => col.propertyName === last || col.propertyPath === last);
+    }
+
+    /**
+     * Whether a field path touches a hidden column/relation at any segment — a hidden
+     * relation, or a hidden column on the root or a related entity. Declared via
+     * `@CrudHidden()` or `@Crud({ hiddenFields })`.
+     */
+    public isHiddenField(field: string): boolean {
+        if (!field || typeof field !== 'string') {
+            return false;
+        }
+        const parts = field.split('.');
+        let metadata: EntityMetadata = this.repository.metadata;
+        let hidden = this.hiddenRootFields;
+        for (let i = 0; i < parts.length; i++) {
+            if (hidden.has(parts[i])) {
+                return true;
+            }
+            const relation = metadata.relations.find((rel) => rel.propertyName === parts[i]);
+            if (!relation) {
+                break;
+            }
+            metadata = relation.inverseEntityMetadata;
+            hidden = getHiddenFields(metadata.target);
+        }
+        return false;
+    }
+
+    /** Root entity columns minus hidden ones — the default (no explicit select) projection. */
+    public get visibleColumns(): string[] {
+        return this.hiddenRootFields.size
+            ? this.entityColumns.filter((col) => !this.hiddenRootFields.has(col))
+            : this.entityColumns;
+    }
+
+    /** Non-hidden columns of a related entity reached at `relationPath`. */
+    public visibleRelationColumns(relationPath: string, columns: string[]): string[] {
+        const hidden = this.relationHiddenFields(relationPath);
+        return hidden.size ? columns.filter((col) => !hidden.has(col)) : columns;
+    }
+
+    /** Hidden columns/relations declared on the entity at the end of `relationPath`. */
+    public relationHiddenFields(relationPath: string): Set<string> {
+        let metadata: EntityMetadata | null = this.repository.metadata;
+        for (const segment of relationPath.split('.')) {
+            const relation = metadata?.relations.find((rel) => rel.propertyName === segment);
+            if (!relation) {
+                return new Set<string>();
+            }
+            metadata = relation.inverseEntityMetadata;
+        }
+        return metadata ? getHiddenFields(metadata.target) : new Set<string>();
     }
 
     /**

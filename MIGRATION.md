@@ -59,6 +59,10 @@ v1.2.x.
   ```
   GET /users?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]&having={"postCount":{"$gt":5}}&order={"postCount":"DESC"}
   ```
+- **Hidden / sensitive fields.** `@CrudHidden()` on a column/relation (or
+  `@Crud({ hiddenFields })`) removes it from responses and blocks it in
+  `where` / `order` / `aggregates` / `relations`. The previously-inert
+  `hiddenFields` option is now enforced.
 - **New operators.** `$ieq` (case-insensitive equality), `$exists` / `$notExists`
   (relation existence).
 - **Custom operators.** `WhereOperatorRegistry.register(token, handler)` to add your

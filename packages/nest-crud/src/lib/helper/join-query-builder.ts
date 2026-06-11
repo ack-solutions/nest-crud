@@ -1,4 +1,5 @@
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { RelationObject, RelationObjectValue, RelationOptions, WhereObject } from '../types';
 import { WhereQueryBuilder } from './where-query-builder';
 import { isArrayFull } from '../utils';
@@ -97,6 +98,10 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
     }
 
     protected setJoin(name: string, options: RelationObjectValue) {
+        // Never join a hidden relation (or one reached through a hidden relation).
+        if (this.helper.isHiddenField(name)) {
+            throw new BadRequestException(`Invalid relation: '${name}'`);
+        }
         const segments = name.split('.');
 
         if (segments.length === 1) {
@@ -117,6 +122,8 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
                     ? options.select.filter((column) => allowedRelation.allowedColumns.some((allowed) => allowed === column))
                     : allowedRelation.allowedColumns;
             }
+            // Exclude hidden columns of the related entity.
+            columns = this.helper.visibleRelationColumns(name, columns);
 
             const select = new Set(
                 [...allowedRelation.primaryColumns, ...columns].map(
@@ -158,7 +165,8 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
                     ? options.select.filter((column) => allowedRelation.allowedColumns.some((allowed) => allowed === column))
                     : options.select;
 
-                const select = (filteredColumns || []).map(col => `${currentAlias}.${col}`);
+                const visible = this.helper.visibleRelationColumns(name, filteredColumns || []);
+                const select = visible.map(col => `${currentAlias}.${col}`);
                 for (const field of select) {
                     this.helper.selectedFields.add(field);
                 }
@@ -169,6 +177,8 @@ export class JoinQueryBuilder<T extends ObjectLiteral> {
                 if (allowedRelation.allowedColumns) {
                     columns = allowedRelation.allowedColumns;
                 }
+                // Exclude hidden columns of the related entity.
+                columns = this.helper.visibleRelationColumns(name, columns);
                 const select = new Set(
                     [...allowedRelation.primaryColumns, ...columns].map(
                         (col) => `${currentAlias}.${col}`,

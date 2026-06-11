@@ -20,6 +20,11 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
 - **`having`** — filter on aggregate aliases using the same operator syntax as
   `where`; `total` reflects the filter and is independent of pagination.
 - **Order by aggregate alias** (alongside root columns).
+- **Hidden / sensitive fields** — mark a column or relation with `@CrudHidden()`
+  (or `@Crud({ hiddenFields })`) and it is dropped from responses and rejected in
+  `where` / `order` / `aggregates` / `relations` (like an unknown field, so its
+  existence isn't revealed). See
+  [Querying → Hiding sensitive fields](./docs/querying.md#hiding-sensitive-fields).
 - **New operators**: `$ieq` (case-insensitive equality), `$exists` / `$notExists`
   (relation existence).
 - **Custom-operator registry** — `WhereOperatorRegistry.register()` /

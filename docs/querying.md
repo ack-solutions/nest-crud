@@ -9,6 +9,46 @@ produces exactly this format.
 GET /users?where={"isActive":true}&relations=["posts"]&order={"createdAt":"DESC"}&take=20&skip=0
 ```
 
+> All examples below use the raw `GET` form for clarity. In a real app you'll
+> usually build these with the [client query builder](#client-query-builder)
+> instead of hand-writing the query string.
+
+## Common queries (cheat sheet)
+
+Copy-paste starting points — each is explained in detail in the sections below.
+
+```bash
+# 1. Active adults, newest first, first page of 20
+GET /users?where={"status":"active","age":{"$gte":18}}&order={"createdAt":"DESC"}&take=20
+
+# 2. Case-insensitive name search (contains "jo")
+GET /users?where={"name":{"$iLike":"%jo%"}}
+
+# 3. Users who have at least one post, with those posts joined
+GET /users?where={"posts":{"$exists":true}}&relations=["posts"]
+
+# 4. Only the columns you need, with the profile relation
+GET /users?select=["id","name"]&relations=[{"profile":{"select":["bio"]}}]
+
+# 5. Top authors: attach postCount, keep only > 5, sort by it
+GET /users?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]&having={"postCount":{"$gt":5}}&order={"postCount":"DESC"}
+
+# 6. Created in a date range
+GET /users?where={"createdAt":{"$between":["2026-01-01","2026-03-31"]}}
+
+# 7. Any of several statuses (IN), excluding two ids
+GET /users?where={"status":{"$in":["active","trial"]},"id":{"$notIn":["u1","u2"]}}
+
+# 8. Active AND (admin OR owner)
+GET /users?where={"$and":[{"status":"active"},{"$or":[{"role":"admin"},{"role":"owner"}]}]}
+
+# 9. Only soft-deleted (trash)
+GET /users?onlyDeleted=true
+
+# 10. Count active users grouped by plan
+GET /users/get/counts?filter={"status":"active"}&groupByKey=plan
+```
+
 ## Query operators
 
 Filters live under `where`. The shorthand `{ "field": value }` means equality;
@@ -83,27 +123,121 @@ connection `dbType`. Remove one with `WhereOperatorRegistry.unregister('$regex')
 
 ## Relations
 
-Join related entities with `relations` (array, object, or JSON string). Nested
-relations use dot notation.
+Join related entities with `relations`. Three forms are accepted:
 
+```jsonc
+// 1. array of names (simplest)
+["posts", "profile"]
+
+// 2. nested via dot notation (parents are joined automatically)
+["posts.comments", "profile.addresses.country"]
+
+// 3. object form — per-relation select / where / join type
+{
+  "posts": { "select": ["id", "title"], "where": { "status": "published" } },
+  "profile": { "joinType": "inner" }
+}
 ```
+
+```bash
+# simple joins
 GET /users?relations=["posts","profile"]
+
+# nested join (comments of each post)
 GET /users?relations=["posts.comments"]
+
+# only published posts, and only their id + title
+GET /users?relations=[{"posts":{"select":["id","title"],"where":{"status":"published"}}}]
+
+# inner-join the profile so users without a profile are excluded
+GET /users?relations=[{"profile":{"joinType":"inner"}}]
 ```
 
-You can filter and sort on relation columns using the same dot notation:
+You can also filter and sort on a relation column from the **top-level** `where` /
+`order` using dot notation:
 
+```bash
+GET /users?relations=["profile"]&where={"profile.age":{"$gte":18}}&order={"profile.age":"DESC"}
 ```
-GET /users?relations=["profile"]&where={"profile.age":{"$gte":18}}
-```
+
+- `joinType` defaults to `left` (rows are kept even with no related row). Use
+  `inner` to drop rows that have no match.
+- A relation-scoped `where` (inside the object form) filters the **joined rows**;
+  a top-level `where` on a relation column filters the **root rows**.
+- To check only *whether* a relation has rows (without joining them), use the
+  [`$exists` / `$notExists`](#query-operators) operators.
 
 ## Select
 
-Limit the returned columns with `select`:
+Limit the returned columns with `select`. The primary key is always included
+(so relations still hydrate), and [hidden fields](#hiding-sensitive-fields) are
+silently dropped.
 
-```
+```bash
+# top-level columns
 GET /users?select=["id","email","firstName"]
+
+# combine with a relation (profile is still fully returned)
+GET /users?select=["id","name"]&relations=["profile"]
+
+# limit relation columns too, via the object form
+GET /users?select=["id","name"]&relations=[{"profile":{"select":["bio","age"]}}]
 ```
+
+## Hiding sensitive fields
+
+By default every real column and relation is queryable — including ones you may
+not want clients to read (password hashes, tokens, internal flags, audit logs).
+Mark them **hidden** and they become invisible to the whole query layer.
+
+Two ways, which can be combined:
+
+**1. On the entity, with `@CrudHidden()`** (recommended — applies everywhere the
+entity is used):
+
+```ts
+import { Entity, Column, OneToMany } from 'typeorm';
+import { BaseEntity, CrudHidden } from '@ackplus/nest-crud';
+
+@Entity()
+export class User extends BaseEntity {
+  @Column() email: string;
+
+  @Column() @CrudHidden() passwordHash: string;          // hidden column
+
+  @OneToMany(() => AuditLog, (a) => a.user)
+  @CrudHidden() auditLogs: AuditLog[];                    // hidden relation
+}
+```
+
+**2. Per controller, with `@Crud({ hiddenFields })`** (no entity change):
+
+```ts
+@Crud({ entity: User, hiddenFields: ['passwordHash'] })
+export class UsersController {}
+```
+
+A hidden field is then:
+
+| Used in… | Result |
+| --- | --- |
+| the response (default or explicit `select`) | **omitted** |
+| `where`, `order`, `aggregates` `field` | **`400`** — rejected like an unknown field |
+| `relations` (hidden relation) | **`400`** |
+| a relation's hidden column (e.g. joined `profile.ssn`) | **omitted** from the join |
+
+```bash
+GET /users?select=["email","passwordHash"]   # passwordHash silently dropped
+GET /users?where={"passwordHash":{"$eq":"x"}}  # 400 Bad Request
+GET /users?relations=["auditLogs"]             # 400 Bad Request
+```
+
+Rejections use the same message as a genuinely unknown field, so a hidden field's
+existence is never revealed. Hidden columns are never even read from the database.
+
+> This guards the **generated CRUD query surface**. It is not a replacement for
+> authorization — combine it with guards (see [auth-and-guards.md](./auth-and-guards.md))
+> for who-can-access rules, and with `beforeFindMany` for row-level scoping.
 
 ## Order
 
@@ -138,6 +272,26 @@ Each aggregate is a **correlated subquery**, so adding several aggregates — or
 joining the same relation via `relations` — never inflates the numbers. Pass
 `distinct: true` for `COUNT(DISTINCT …)`.
 
+Several aggregates at once, returned alongside the joined relation:
+
+```bash
+GET /users?relations=["posts"]&aggregates=[
+  {"fn":"count","field":"posts.id","as":"postCount"},
+  {"fn":"sum","field":"posts.likes","as":"totalLikes"},
+  {"fn":"avg","field":"posts.likes","as":"avgLikes"},
+  {"fn":"max","field":"posts.likes","as":"bestPost"}
+]
+```
+```json
+{
+  "items": [
+    { "id": "u1", "name": "John", "posts": [ /* … */ ],
+      "postCount": 2, "totalLikes": 15, "avgLikes": 7.5, "bestPost": 10 }
+  ],
+  "total": 1
+}
+```
+
 ### Filtering on aggregates — `having`
 
 `having` filters on aggregate aliases using the **same operators** as `where`. The
@@ -162,6 +316,45 @@ GET /users?aggregates=[{"fn":"sum","field":"posts.likes","as":"likesSum"}]&order
 - In an aggregate query, `order` accepts aggregate aliases and root columns.
 - With the client builder: `.addAggregate({...})`, `.having('postCount', '$gt', 5)`,
   `.addOrder('postCount', 'DESC')`.
+
+## Client query builder
+
+`@ackplus/nest-crud-request` builds these query strings for you with a fluent API —
+no hand-written JSON.
+
+```ts
+import {
+  QueryBuilder, WhereOperatorEnum, OrderDirectionEnum, AggregateFnEnum,
+} from '@ackplus/nest-crud-request';
+
+const qb = new QueryBuilder()
+  .where('status', 'active')                        // shorthand equality
+  .andWhere('age', WhereOperatorEnum.GT_OR_EQ, 18)  // explicit operator
+  .addRelation('profile', ['bio'])                  // join + pick relation columns
+  .addSelect(['id', 'name'])
+  .addOrder('createdAt', OrderDirectionEnum.DESC)
+  .setTake(20)
+  .setSkip(0);
+
+// → params for any HTTP client (axios, fetch, …)
+await axios.get('/users', { params: qb.toObject() });
+```
+
+Aggregates with HAVING and order-by-alias:
+
+```ts
+const qb = new QueryBuilder()
+  .addAggregate({ fn: AggregateFnEnum.COUNT, field: 'posts.id', as: 'postCount' })
+  .having('postCount', WhereOperatorEnum.GT, 5)
+  .addOrder('postCount', OrderDirectionEnum.DESC);
+
+await axios.get('/users', { params: qb.toObject() });
+```
+
+- `where` / `having` accept `(field, value)`, `(field, operator, value)`, or a raw
+  object; `orWhere` / `andHaving` / `orHaving` are also available.
+- `.toObject()` returns params with JSON-string values (the default HTTP shape);
+  `.toObject(true)` keeps nested objects; `.toJson()` returns one JSON string.
 
 ## Pagination
 

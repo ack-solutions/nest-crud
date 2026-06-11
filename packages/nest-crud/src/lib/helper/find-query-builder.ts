@@ -1,4 +1,5 @@
 import { Repository, FindManyOptions, SelectQueryBuilder, Not, IsNull, ObjectLiteral } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 
 import { IFindManyOptions } from '../interface/crud';
 import { WhereQueryBuilder } from './where-query-builder';
@@ -87,16 +88,17 @@ export class FindQueryBuilder<T extends ObjectLiteral> {
      */
     private buildSelect(select?: string[]) {
         if (!select || select.length === 0) {
-            this.helper.entityColumns.forEach(col => {
+            // Default projection excludes hidden columns.
+            this.helper.visibleColumns.forEach(col => {
                 this.helper.selectedFields.add(this.helper.getFieldWithAlias(col));
             })
             return;
         }
 
-        // Always include the root primary key(s). Without them, TypeORM cannot map
-        // joined relations back to their parent rows, and an explicit `select` that
-        // omits the id would otherwise drop nested relation data and break identity.
-        const fields = [...select];
+        // Silently drop hidden fields from an explicit select (don't reveal them),
+        // then always include the root primary key(s). Without the pk, TypeORM cannot
+        // map joined relations back to their parent rows and entity identity is lost.
+        const fields = select.filter((field) => !this.helper.isHiddenField(field));
         for (const pk of this.helper.entityPrimaryColumns) {
             if (!fields.includes(pk)) {
                 fields.push(pk);
@@ -112,10 +114,10 @@ export class FindQueryBuilder<T extends ObjectLiteral> {
         const quote = this.helper.getIdentifierQuote();
         // Don't call orderBy which overwrites everything, just use addOrderBy
         for (const key in order) {
-            // let field = this.helper.getFieldWithAlias(key);
-            // field = this.helper.cleanFieldName(field);
-            // this.builder.addOrderBy(field, order[key]);
-
+            // Never order by a hidden column/relation (reject like an unknown field).
+            if (this.helper.isHiddenField(key)) {
+                throw new BadRequestException(`Invalid order field: '${key}'`);
+            }
 
             let orderByExpression: string;
             const hasDot = key.includes('.');

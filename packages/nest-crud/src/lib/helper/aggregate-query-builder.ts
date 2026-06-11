@@ -80,7 +80,7 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
                 orderPlan.push({ alias: key, dir: order[key] });
                 continue;
             }
-            if (helper.entityColumns.includes(key) && !key.includes('.')) {
+            if (helper.visibleColumns.includes(key) && !key.includes('.')) {
                 const derivedAlias = `ord_${key}`;
                 inner.addSelect(helper.getFieldWithAlias(key), derivedAlias);
                 orderPlan.push({ alias: derivedAlias, dir: order[key] });
