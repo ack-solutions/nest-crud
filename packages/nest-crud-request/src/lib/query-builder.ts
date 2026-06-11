@@ -1,5 +1,5 @@
 import { RelationBuilder } from './relation-builder';
-import { QueryBuilderOptions, OrderDirectionEnum, AggregateSpec } from './types';
+import { QueryBuilderOptions, OrderDirectionEnum, AggregateSpec, RelationObjectValue } from './types';
 import { deepMerge } from './utils';
 import { WhereBuilder, WhereBuilderCondition } from './where-builder';
 
@@ -67,8 +67,13 @@ export class QueryBuilder {
         return this;
     }
 
-    addRelation(relation: string, select?: string[], where?: Record<string, any>): this {
-        this.relationBuilder.add(relation, select, where);
+    addRelation(
+        relation: string,
+        select?: string[] | RelationObjectValue,
+        where?: Record<string, any>,
+        joinType?: 'left' | 'inner',
+    ): this {
+        this.relationBuilder.add(relation, select as any, where, joinType);
         return this;
     }
 

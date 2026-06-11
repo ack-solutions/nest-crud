@@ -32,19 +32,42 @@ export class RelationBuilder {
         return this;
     }
 
-    add(relation: string, select?: string[], where?: Record<string, any>): this {
-        if (!select && !where) {
-            this.relations[relation] = true;
-        } else {
-            const obj: any = {};
-            if (select) {
-                obj.select = select;
-            }
-            if (where) {
-                obj.where = where;
-            }
-            this.relations[relation] = obj;
+    /**
+     * Add (or replace) a relation. Two call styles, both optional after the name:
+     *
+     * ```ts
+     * builder.add('posts');                                   // join, all columns
+     * builder.add('posts', ['id', 'title']);                  // pick columns
+     * builder.add('posts', ['id'], { status: 'published' });  // + relation-scoped where
+     * builder.add('posts', ['id'], undefined, 'inner');       // + inner join
+     * builder.add('posts', { select: ['id'], joinType: 'inner' }); // object config
+     * ```
+     */
+    add(
+        relation: string,
+        select?: string[] | RelationObjectValue,
+        where?: Record<string, any>,
+        joinType?: 'left' | 'inner',
+    ): this {
+        // Object-config form: add('posts', { select, where, joinType })
+        if (select && !Array.isArray(select) && typeof select === 'object') {
+            const config = select as RelationObjectValue;
+            this.relations[relation] = Object.keys(config).length ? { ...config } : true;
+            return this;
         }
+
+        // Positional form
+        const config: RelationObjectValue = {};
+        if (select) {
+            config.select = select as string[];
+        }
+        if (where) {
+            config.where = where;
+        }
+        if (joinType) {
+            config.joinType = joinType;
+        }
+        this.relations[relation] = Object.keys(config).length ? config : true;
         return this;
     }
 

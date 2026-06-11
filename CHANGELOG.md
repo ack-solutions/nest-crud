@@ -33,7 +33,9 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   `createAggregateQueryBuilder()`.
 - Client builder (`@ackplus/nest-crud-request`): `addAggregate()`, `having()` /
   `andHaving()` / `orHaving()`, and `removeAggregate()`; aggregates / having are
-  serialised in `toObject()` / `toJson()`.
+  serialised in `toObject()` / `toJson()`. `addRelation()` now supports `joinType`
+  (positional or `{ select, where, joinType }` object form); `RelationBuilder` is
+  exported. Removed dead code; the README documents every operator with its type.
 
 ### Changed
 
