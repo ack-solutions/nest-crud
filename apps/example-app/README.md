@@ -153,6 +153,12 @@ create (via bulk), find, filter, operators (`$iLike` / `$isTrue` / `$isFalse`),
 nested relations, aggregates + having, counts, hidden field/relation rejection,
 update, **soft-delete → trash → restore**, **bulk** update/delete, and **reorder**.
 
+`test/query-builder.e2e-spec.ts` goes further: each test builds a **complex,
+multi-feature** request with the client [`QueryBuilder`](../../packages/nest-crud-request)
+(`@ackplus/nest-crud-request`) — filter + search + sort + pagination, grouped
+AND/OR + select + relations + aggregates + having — and runs it against Postgres,
+validating the whole `builder → query string → server → DB` round-trip.
+
 It is **opt-in** — it only runs when a Postgres target is configured (otherwise
 it's skipped), so it never breaks machines/CI without a database. Point it at any
 Postgres via env vars (or `DATABASE_URL`); it creates and TRUNCATEs only its own

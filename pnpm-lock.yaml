@@ -20,6 +20,9 @@ importers:
       '@ackplus/nest-crud':
         specifier: workspace:*
         version: link:../../packages/nest-crud
+      '@ackplus/nest-crud-request':
+        specifier: workspace:*
+        version: link:../../packages/nest-crud-request
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.9(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)

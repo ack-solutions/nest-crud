@@ -1,82 +1,23 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 
-import { User } from '../src/database/entities/user.entity';
-import { Post } from '../src/database/entities/post.entity';
-import { Profile } from '../src/database/entities/profile.entity';
-import { Address } from '../src/database/entities/address.entity';
-import { Comment } from '../src/database/entities/comment.entity';
-import { AuditLog } from '../src/database/entities/audit-log.entity';
-import { Task } from '../src/database/entities/task.entity';
-import { UserModule } from '../src/users/user.module';
-import { PostModule } from '../src/posts/post.module';
-import { ProfileModule } from '../src/profiles/profile.module';
-import { CommentModule } from '../src/comments/comment.module';
-import { TaskModule } from '../src/tasks/task.module';
+import { bootstrapPgApp, describePg, truncateAll } from './pg-setup';
 
 /**
  * End-to-end tests against a REAL Postgres database. Unlike the package's sql.js
  * tests, these validate the full stack on a production-grade DB (real soft-delete
  * timestamps, `$iLike` / `$isTrue` / `$isFalse`, transactions, case-sensitivity).
  *
- * Opt-in: the suite only runs when a Postgres target is configured via env, so it
- * never fails on machines / CI without a database:
- *
- *   DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres \
- *   DB_NAME=nest_crud_e2e pnpm -C apps/example-app test:e2e
- *
- * or a single `DATABASE_URL=postgres://user:pass@host:5432/db`. It synchronises its
- * own tables and TRUNCATEs only those tables before each test.
+ * Opt-in via env (see ./pg-setup). Runs `describe.skip` without a configured DB.
  */
-const hasPgTarget = !!(
-  process.env.DATABASE_URL ||
-  process.env.DB_HOST ||
-  process.env.PGHOST ||
-  process.env.RUN_PG_E2E
-);
-const describePg = hasPgTarget ? describe : describe.skip;
-
-const entities = [User, Post, Profile, Address, Comment, AuditLog, Task];
-
-function typeOrmConfig() {
-  return {
-    type: 'postgres' as const,
-    url: process.env.DATABASE_URL,
-    host: process.env.DB_HOST ?? process.env.PGHOST ?? 'localhost',
-    port: Number(process.env.DB_PORT ?? process.env.PGPORT ?? 5432),
-    username: process.env.DB_USER ?? process.env.PGUSER ?? 'postgres',
-    password: process.env.DB_PASSWORD ?? process.env.PGPASSWORD ?? 'postgres',
-    database: process.env.DB_NAME ?? process.env.PGDATABASE ?? 'nest_crud_e2e',
-    entities,
-    synchronize: true,
-    logging: false,
-  };
-}
-
 describePg('Postgres e2e (real database)', () => {
   let app: INestApplication;
   let ds: DataSource;
   const http = () => request(app.getHttpServer());
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [
-        TypeOrmModule.forRoot(typeOrmConfig()),
-        UserModule,
-        PostModule,
-        ProfileModule,
-        CommentModule,
-        TaskModule,
-      ],
-    }).compile();
-
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
-    await app.init();
-    ds = app.get(DataSource);
+    ({ app, ds } = await bootstrapPgApp());
   });
 
   afterAll(async () => {
@@ -84,8 +25,7 @@ describePg('Postgres e2e (real database)', () => {
   });
 
   beforeEach(async () => {
-    // Clean only our tables (CASCADE handles FK order). Never touches other schemas.
-    await ds.query('TRUNCATE TABLE users, posts, comments, profiles, addresses, audit_logs, tasks RESTART IDENTITY CASCADE');
+    await truncateAll(ds);
   });
 
   /** Create the base dataset entirely through the generated CRUD endpoints. */
