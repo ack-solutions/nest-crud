@@ -160,6 +160,25 @@ describe('CRUD HTTP routes', () => {
             expect(names).toEqual(['A2', 'B2']);
         });
 
+        it('static routes (/bulk, /reorder) are not shadowed by /:id', async () => {
+            // `PUT /:id` and `PUT /bulk` share a shape; the factory registers the
+            // static route first so Express matches it before `:id` (= "bulk").
+            const a = await http().post('/users').send(sample).expect(201);
+
+            // PUT /bulk -> updateMany (array). If shadowed by /:id (id="bulk") it would 404.
+            const bulk = await http()
+                .put('/users/bulk')
+                .send({ bulk: [{ id: a.body.id, name: 'BulkWins' }] })
+                .expect(200);
+            expect(Array.isArray(bulk.body)).toBe(true);
+            expect(bulk.body[0].name).toBe('BulkWins');
+
+            // POST /bulk -> createMany (not POST / create), and PUT /:id still routes to update.
+            await http().post('/users/bulk').send({ bulk: [{ name: 'Z', email: 'z@example.com' }] }).expect(201);
+            const single = await http().put(`/users/${a.body.id}`).send({ name: 'SingleWins' }).expect(200);
+            expect(single.body.name).toBe('SingleWins');
+        });
+
         it('DELETE /:id removes a record, then it 404s', async () => {
             const created = await http().post('/users').send(sample).expect(201);
             await http().delete(`/users/${created.body.id}`).expect(200);
