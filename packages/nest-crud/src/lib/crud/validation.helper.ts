@@ -15,7 +15,7 @@ import { WhereOptions } from '../types';
  * @returns Markdown formatted link to documentation
  */
 const docsLink = (anchor?: string): string => {
-    const baseUrl = 'https://github.com/ack-solutions/nest-crud/blob/main/docs/querying.md';
+    const baseUrl = 'https://ack-solutions.github.io/nest-crud/querying';
     const url = anchor ? `${baseUrl}#${anchor}` : baseUrl;
     return `[Documentation](${url})`;
 };
