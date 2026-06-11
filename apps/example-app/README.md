@@ -165,9 +165,16 @@ Two suites run against your Postgres (each TRUNCATEs only its own tables):
   with the client [`QueryBuilder`](../../packages/nest-crud-request): filter +
   search + sort + pagination, grouped AND/OR + select + relations + aggregates +
   having — validating the whole `builder → query string → server → DB` round-trip.
+- **`test/operators.e2e-spec.ts`** — **every operator**, one by one, plus edge
+  cases: `$eq/$ne/$gt/$gte/$lt/$lte`, `$between/$notBetween`, `$in/$notIn/$inL`,
+  `$like/$iLike/$startsWith/$endsWith/$iStartsWith`, `$isNull/$isNotNull/$isTrue/
+  $isFalse/$ieq`, `$exists/$notExists`, nested `$and`/`$or`, NULL handling,
+  multi-column ordering, pagination beyond the last page, and the unknown-field 400.
 
-The suites are **opt-in**: if no Postgres is configured (no `.env` / DB env), they
-`describe.skip` so CI without a database isn't broken. Inline env wins over `.env`
-(`DB_HOST=… DB_PORT=… pnpm test:e2e`), and a single `DATABASE_URL` also works.
+The suites are **opt-in**: if no Postgres is configured they `describe.skip`, and a
+sentinel test prints exactly why (so a skip is never silent). **Put your `.env` at
+`apps/example-app/.env`** (next to this README) — that's where it's loaded from.
+Inline env wins over `.env` (`DB_HOST=… DB_PORT=… pnpm test:e2e`), and a single
+`DATABASE_URL` also works.
 
 See the [docs site](https://ack-solutions.github.io/nest-crud/) for the full guide.

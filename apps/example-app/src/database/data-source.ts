@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { config as loadEnv } from 'dotenv';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
@@ -10,10 +11,19 @@ import { Comment } from './entities/comment.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { Task } from './entities/task.entity';
 
-// Load apps/example-app/.env once, for both `pnpm start` and the e2e tests, so the
-// Postgres credentials are set in a file instead of typed on every run. dotenv does
-// not override variables already in the environment, so inline env still wins.
-loadEnv({ path: join(__dirname, '..', '..', '.env') });
+// Load .env once, for both `pnpm start` and the e2e tests, so the Postgres
+// credentials live in a file instead of a long command prefix. We check a few
+// common locations so it works wherever you put the file; dotenv does not override
+// variables already in the environment, so inline env still wins.
+for (const candidate of [
+    join(__dirname, '..', '..', '.env'),             // apps/example-app/.env (recommended)
+    join(__dirname, '..', '..', '..', '..', '.env'), // repo root .env
+    join(process.cwd(), '.env'),                     // current working directory
+]) {
+    if (existsSync(candidate)) {
+        loadEnv({ path: candidate });
+    }
+}
 
 export const entities = [User, Post, Profile, Address, Comment, AuditLog, Task];
 
