@@ -57,6 +57,15 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
 - The 23-operator `where` builder was refactored to a registry (behaviour and
   emitted SQL are identical for existing operators).
 
+### Fixed
+
+- **`PUT /reorder` over HTTP**: the route handler passed the validated body object
+  (`{ ids: [...] }`) straight to `service.reorder()` (which expects an id array),
+  so with validation enabled reordering silently did nothing. The handler now
+  unwraps `ids`. The documented body is `{ "ids": [...] }` (the old raw-array
+  example was incorrect). Covered by a new HTTP reorder test and the Postgres e2e
+  suite in `apps/example-app`.
+
 ### Notes
 
 - Order keys in an **aggregate** query are restricted to aggregate aliases and

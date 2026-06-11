@@ -11,8 +11,9 @@ import { AppModule } from './../src/app.module';
 describe('Example app (e2e)', () => {
   let app: INestApplication;
 
+  // Unique email so it never collides with the seeded demo users.
   const sampleUser = {
-    email: 'jane@example.com',
+    email: 'smoke-test@example.com',
     firstName: 'Jane',
     lastName: 'Doe',
     password: 'secret',

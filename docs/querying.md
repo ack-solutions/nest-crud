@@ -415,11 +415,12 @@ See [soft-delete.md](./soft-delete.md) for the trash / restore routes.
 ## Reorder
 
 For entities extending `BaseEntityWithOrder`, `PUT /resource/reorder` accepts an
-ordered array of ids and writes their `order` field (0, 1, 2, …) in a transaction.
+ordered list of ids and writes their `order` field (0, 1, 2, …) in a transaction.
+The body is `{ "ids": [...] }`.
 
 ```bash
 curl -X PUT localhost:3000/items/reorder -H 'content-type: application/json' \
-  -d '["id-3","id-1","id-2"]'
+  -d '{"ids":["id-3","id-1","id-2"]}'
 ```
 
 ## Extending the service

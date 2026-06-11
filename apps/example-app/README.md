@@ -139,4 +139,37 @@ const params = new QueryBuilder()
 await axios.get('/users', { params });
 ```
 
+## Tests
+
+```bash
+# smoke e2e over in-memory SQLite (always runs, no setup)
+pnpm -C apps/example-app test:e2e
+```
+
+### End-to-end against real Postgres
+
+`test/postgres.e2e-spec.ts` exercises the full stack on a real Postgres DB —
+create (via bulk), find, filter, operators (`$iLike` / `$isTrue` / `$isFalse`),
+nested relations, aggregates + having, counts, hidden field/relation rejection,
+update, **soft-delete → trash → restore**, **bulk** update/delete, and **reorder**.
+
+It is **opt-in** — it only runs when a Postgres target is configured (otherwise
+it's skipped), so it never breaks machines/CI without a database. Point it at any
+Postgres via env vars (or `DATABASE_URL`); it creates and TRUNCATEs only its own
+tables.
+
+```bash
+# 1. a throwaway Postgres (or use your own)
+docker run -d --name pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=nest_crud_e2e -p 5432:5432 postgres:16-alpine
+
+# 2. build the lib, then run the e2e against it
+pnpm -C packages/nest-crud build
+DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=nest_crud_e2e \
+  pnpm -C apps/example-app test:e2e
+
+# (or a single connection string)
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/nest_crud_e2e \
+  pnpm -C apps/example-app test:e2e
+```
+
 See the [docs site](https://ack-solutions.github.io/nest-crud/) for the full guide.
