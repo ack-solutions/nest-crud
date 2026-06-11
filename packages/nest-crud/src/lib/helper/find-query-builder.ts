@@ -93,15 +93,18 @@ export class FindQueryBuilder<T extends ObjectLiteral> {
             return;
         }
 
-        // Build array of fields with aliases
-        const fieldsWithAliases: string[] = [];
-        for (const field of select) {
-            const fieldWithAlias = this.helper.getFieldWithAlias(field);
-            fieldsWithAliases.push(fieldWithAlias);
+        // Always include the root primary key(s). Without them, TypeORM cannot map
+        // joined relations back to their parent rows, and an explicit `select` that
+        // omits the id would otherwise drop nested relation data and break identity.
+        const fields = [...select];
+        for (const pk of this.helper.entityPrimaryColumns) {
+            if (!fields.includes(pk)) {
+                fields.push(pk);
+            }
         }
 
-        for (const field of fieldsWithAliases) {
-            this.helper.selectedFields.add(field);
+        for (const field of fields) {
+            this.helper.selectedFields.add(this.helper.getFieldWithAlias(field));
         }
     }
 

@@ -1,5 +1,7 @@
+import { BadRequestException } from '@nestjs/common';
 import { EntityMetadata, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import { normalizeColumnName } from '../utils';
+import { AggregateSpec } from '../types';
 
 /**
  * Shared helper class for query builders to handle common entity metadata,
@@ -228,6 +230,120 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         }
         const last = parts[parts.length - 1];
         return metadata.columns.some((col) => col.propertyName === last || col.propertyPath === last);
+    }
+
+    /**
+     * An aggregate field must be relation-qualified (`posts.id`) and resolve to a
+     * real column reached through real relations — same allowlist walk as a where key.
+     */
+    public isAllowedAggregateField(field: string): boolean {
+        return typeof field === 'string' && field.includes('.') && this.isAllowedField(field);
+    }
+
+    /**
+     * Build the pieces of a correlated scalar subquery for an aggregate over a
+     * single-level relation: the related table, a unique child alias, and the
+     * `child.fk = root.pk` join condition (derived from `RelationMetadata`).
+     *
+     * Supports to-one / one-to-many (FK on either side). Many-to-many is rejected
+     * (it needs a junction join — a documented limitation for now).
+     */
+    public correlation(relationPath: string): { table: string; alias: string; condition: string } {
+        const relation = this.repository.metadata.relations.find((rel) => rel.propertyName === relationPath);
+        if (!relation) {
+            throw new BadRequestException(`Unknown relation '${relationPath}' for aggregate`);
+        }
+        if (relation.isManyToMany) {
+            throw new BadRequestException(`Aggregates over many-to-many relations are not supported ('${relationPath}')`);
+        }
+
+        // The FK lives on the child for one-to-many / inverse one-to-one; otherwise
+        // it lives on the root (many-to-one / owning one-to-one).
+        const fkOnChild = relation.isOneToMany || relation.isOneToOneNotOwner;
+        const joinColumns = fkOnChild ? relation.inverseRelation?.joinColumns : relation.joinColumns;
+        if (!joinColumns || joinColumns.length === 0) {
+            throw new BadRequestException(`Cannot build an aggregate for relation '${relationPath}'`);
+        }
+
+        const quote = this.getIdentifierQuote();
+        const q = (id: string) => `${quote}${id}${quote}`;
+        const alias = `agg_${relationPath.replace(/[^A-Za-z0-9_]/g, '_')}`;
+        const condition = joinColumns
+            .map((jc) => {
+                const childCol = fkOnChild ? jc.databaseName : jc.referencedColumn!.databaseName;
+                const rootCol = fkOnChild ? jc.referencedColumn!.databaseName : jc.databaseName;
+                return `${q(alias)}.${q(childCol)} = ${q(this.rootAlias)}.${q(rootCol)}`;
+            })
+            .join(' AND ');
+
+        return { table: relation.inverseEntityMetadata.tableName, alias, condition };
+    }
+
+    /**
+     * Compile an {@link AggregateSpec} into a correlated scalar subquery string.
+     * `count`/`sum` are wrapped in `COALESCE(…, 0)` (empty set → 0); `avg`/`min`/`max`
+     * stay NULL (undefined over an empty set). Returns the SQL plus the alias and a
+     * `numeric` flag — true when the raw string result should be coerced to a number
+     * (`count`/`sum`/`avg`, and `min`/`max` over a numeric column; `min`/`max` over a
+     * date/string column are returned verbatim).
+     */
+    public compileAggregate(spec: AggregateSpec): { as: string; sql: string; numeric: boolean } {
+        if (!spec || typeof spec.as !== 'string' || typeof spec.field !== 'string') {
+            throw new BadRequestException('Invalid aggregate spec');
+        }
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(spec.as)) {
+            throw new BadRequestException(`Invalid aggregate alias: '${spec.as}'`);
+        }
+        if (this.entityColumns.includes(spec.as)) {
+            throw new BadRequestException(`Aggregate alias '${spec.as}' collides with an entity column`);
+        }
+        if (!this.isAllowedAggregateField(spec.field)) {
+            throw new BadRequestException(`Invalid aggregate field: '${spec.field}'`);
+        }
+
+        const parts = spec.field.split('.');
+        const column = parts[parts.length - 1];
+        const relationPath = parts.slice(0, -1).join('.');
+        const fn = String(spec.fn).toLowerCase();
+
+        const { table, alias, condition } = this.correlation(relationPath);
+        const quote = this.getIdentifierQuote();
+        const col = `${quote}${alias}${quote}.${quote}${column}${quote}`;
+
+        let inner: string;
+        switch (fn) {
+            case 'count': inner = `COUNT(${spec.distinct ? 'DISTINCT ' : ''}${col})`; break;
+            case 'sum': inner = `SUM(${col})`; break;
+            case 'avg': inner = `AVG(${col})`; break;
+            case 'min': inner = `MIN(${col})`; break;
+            case 'max': inner = `MAX(${col})`; break;
+            default: throw new BadRequestException(`Unsupported aggregate function: '${spec.fn}'`);
+        }
+
+        const expr = fn === 'count' || fn === 'sum' ? `COALESCE(${inner}, 0)` : inner;
+        const sql = `SELECT ${expr} FROM ${quote}${table}${quote} ${quote}${alias}${quote} WHERE ${condition}`;
+        return { as: spec.as, sql, numeric: this.isNumericAggregate(fn, relationPath, column) };
+    }
+
+    /** Whether an aggregate's raw result should be coerced to a JS number. */
+    private isNumericAggregate(fn: string, relationPath: string, column: string): boolean {
+        if (fn === 'count' || fn === 'sum' || fn === 'avg') {
+            return true;
+        }
+        // min/max: coerce only when the underlying column is numeric (preserve dates/strings).
+        const relation = this.repository.metadata.relations.find((rel) => rel.propertyName === relationPath);
+        const colMeta = relation?.inverseEntityMetadata.columns.find(
+            (c) => c.propertyName === column || c.propertyPath === column,
+        );
+        if (!colMeta) {
+            return false;
+        }
+        if (colMeta.type === Number) {
+            return true;
+        }
+        const numericTypes = ['int', 'smallint', 'bigint', 'tinyint', 'mediumint', 'float', 'double', 'decimal', 'numeric', 'real', 'dec', 'fixed'];
+        const colType = String(colMeta.type).toLowerCase();
+        return numericTypes.some((t) => colType.includes(t));
     }
 
     /**

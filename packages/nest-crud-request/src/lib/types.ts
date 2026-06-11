@@ -6,6 +6,7 @@ export enum WhereLogicalOperatorEnum {
 export enum WhereOperatorEnum {
     EQ = '$eq',
     NOT_EQ = '$ne',
+    IEQ = '$ieq', // case-insensitive equality
     GT = '$gt',
     GT_OR_EQ = '$gte',
     LT = '$lt',
@@ -30,6 +31,8 @@ export enum WhereOperatorEnum {
     NOT_BETWEEN = '$notBetween',
     IS_TRUE = '$isTrue',
     IS_FALSE = '$isFalse',
+    EXISTS = '$exists', // relation-existence: { posts: { $exists: true } }
+    NOT_EXISTS = '$notExists', // relation-existence: { posts: { $notExists: true } }
 }
 
 export enum OrderDirectionEnum {
@@ -55,6 +58,27 @@ export type RelationObject = Record<string, RelationObjectValue | boolean>;
 
 export type RelationOptions = string | string[] | RelationObject;
 
+export enum AggregateFnEnum {
+    COUNT = 'count',
+    SUM = 'sum',
+    AVG = 'avg',
+    MIN = 'min',
+    MAX = 'max',
+}
+
+/**
+ * A computed aggregate attached to each returned row, e.g.
+ * `{ fn: 'count', field: 'posts.id', as: 'postCount' }`. `field` is a
+ * relation-qualified path; `as` must be a safe identifier and is what
+ * `having` / `order` reference. Mirrors the server `AggregateSpec`.
+ */
+export interface AggregateSpec {
+    fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
+    field: string;
+    as: string;
+    distinct?: boolean;
+}
+
 // QueryBuilderOptions is specific to nest-crud-request
 export interface QueryBuilderOptions {
     [key: string]: any;
@@ -62,6 +86,8 @@ export interface QueryBuilderOptions {
     relations?: RelationOptions | string;
     where?: WhereOptions | string;
     order?: Record<string, OrderDirectionEnum> | string;
+    aggregates?: AggregateSpec[] | string;
+    having?: WhereOptions | string;
     skip?: number;
     take?: number;
     withDeleted?: boolean;

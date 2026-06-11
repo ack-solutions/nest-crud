@@ -27,6 +27,7 @@ the full form is `{ "field": { "$operator": value } }`.
 | --- | --- | --- |
 | `$eq` | equals (default) | `{ "status": { "$eq": "active" } }` |
 | `$ne` | not equals | `{ "status": { "$ne": "active" } }` |
+| `$ieq` | case-insensitive equals | `{ "name": { "$ieq": "john" } }` |
 | `$gt` `$gte` | greater than / or equal | `{ "age": { "$gte": 18 } }` |
 | `$lt` `$lte` | less than / or equal | `{ "age": { "$lt": 65 } }` |
 | `$like` `$notLike` | SQL LIKE (case-sensitive) | `{ "name": { "$like": "%jo%" } }` |
@@ -39,6 +40,7 @@ the full form is `{ "field": { "$operator": value } }`.
 | `$isNull` `$isNotNull` | null checks | `{ "deletedAt": { "$isNull": true } }` |
 | `$isTrue` `$isFalse` | boolean checks | `{ "isActive": { "$isTrue": true } }` |
 | `$contArr` `$intersectsArr` | Postgres array contains / overlaps | `{ "tags": { "$contArr": ["a"] } }` |
+| `$exists` `$notExists` | relation has / has no related rows | `{ "posts": { "$exists": true } }` |
 
 Combine conditions with `$and` / `$or` (they take an array of sub-conditions):
 
@@ -55,8 +57,29 @@ Combine conditions with `$and` / `$or` (they take an array of sub-conditions):
 - Empty `$in: []` matches nothing; empty `$notIn: []` matches everything.
 - `$between` requires exactly `[start, end]`.
 - `$contArr` / `$intersectsArr` are PostgreSQL-only.
+- `$exists` / `$notExists` apply to a **relation** name (not a column) and take a
+  boolean: `{ "posts": { "$exists": true } }` keeps only rows with at least one
+  related row. `$exists: false` is equivalent to `$notExists: true`.
 - Filter **values** are always parameterised. Unknown filter **fields** are
   rejected with `400 Bad Request` (only real columns / relation paths are allowed).
+
+## Custom operators
+
+Operators are resolved through a registry, so you can add your own without forking
+the library:
+
+```ts
+import { WhereOperatorRegistry } from '@ackplus/nest-crud';
+
+WhereOperatorRegistry.register('$regex', ({ column, value, param }) => ({
+  query: `${column} ~ :${param}`,
+  params: { [param]: value },
+}));
+```
+
+Now `where: { "name": { "$regex": "^A" } }` works. The handler receives the
+already-resolved, quoted `column`, a unique `param` name, the raw `value`, and the
+connection `dbType`. Remove one with `WhereOperatorRegistry.unregister('$regex')`.
 
 ## Relations
 
@@ -89,6 +112,56 @@ Sort with `order` (a map of column → `ASC` | `DESC`):
 ```
 GET /users?order={"createdAt":"DESC","firstName":"ASC"}
 ```
+
+## Aggregates
+
+Attach computed `count` / `sum` / `avg` / `min` / `max` values to each returned
+row with `aggregates` — a list of
+`{ fn, field, as }` specs. `field` is a relation-qualified path; `as` is the key
+the value is returned under (and what `having` / `order` reference).
+
+```
+GET /users?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]
+```
+```json
+{ "items": [ { "id": "…", "name": "John", "postCount": 2 } ], "total": 1 }
+```
+
+| `fn` | Meaning | Empty relation |
+| --- | --- | --- |
+| `count` | number of related rows | `0` |
+| `sum` | sum of a related column | `0` |
+| `avg` | average of a related column | `null` |
+| `min` `max` | min / max of a related column | `null` |
+
+Each aggregate is a **correlated subquery**, so adding several aggregates — or
+joining the same relation via `relations` — never inflates the numbers. Pass
+`distinct: true` for `COUNT(DISTINCT …)`.
+
+### Filtering on aggregates — `having`
+
+`having` filters on aggregate aliases using the **same operators** as `where`. The
+returned `total` reflects the filter and is independent of pagination:
+
+```
+GET /users?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]&having={"postCount":{"$gt":5}}
+```
+
+### Sorting on aggregates
+
+`order` can reference an aggregate alias (or any root column):
+
+```
+GET /users?aggregates=[{"fn":"sum","field":"posts.likes","as":"likesSum"}]&order={"likesSum":"DESC"}
+```
+
+**Notes**
+- `field` must be relation-qualified (e.g. `posts.id`); `as` must be a safe
+  identifier and cannot collide with an entity column.
+- Aggregates are over single-level relations; many-to-many is not yet supported.
+- In an aggregate query, `order` accepts aggregate aliases and root columns.
+- With the client builder: `.addAggregate({...})`, `.having('postCount', '$gt', 5)`,
+  `.addOrder('postCount', 'DESC')`.
 
 ## Pagination
 
@@ -155,3 +228,25 @@ ordered array of ids and writes their `order` field (0, 1, 2, …) in a transact
 curl -X PUT localhost:3000/items/reorder -H 'content-type: application/json' \
   -d '["id-3","id-1","id-2"]'
 ```
+
+## Extending the service
+
+`CrudService` exposes override points so you can customise behaviour in a subclass
+rather than patching the library:
+
+- `beforeFindMany` / `beforeFindOne` / `beforeCounts` — add `andWhere`, force joins,
+  default ordering, tenant scoping. (Do **not** call `.select()` here.)
+- `createFindQueryBuilder()` — swap or wrap the list query builder.
+- `createAggregateQueryBuilder()` — customise the two-phase aggregate execution.
+
+```ts
+@Injectable()
+export class UserService extends CrudService<User> {
+  protected async beforeFindMany(qb) {
+    return qb.andWhere(`${qb.alias}.tenantId = :tid`, { tid: currentTenant() });
+  }
+}
+```
+
+> `beforeFindMany` is not applied on the aggregate path — override
+> `createAggregateQueryBuilder()` to customise that.

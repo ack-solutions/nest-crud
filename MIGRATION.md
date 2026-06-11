@@ -49,6 +49,29 @@ v1.2.x.
   });
   ```
 
+## New in v2.1 (non-breaking additions)
+
+`2.1.0` is **purely additive** over `2.0.0` — upgrade with no code changes. See
+[Querying → Aggregates](./docs/querying.md#aggregates).
+
+- **Aggregates + `having` + order-by-aggregate.** Attach per-row
+  `count`/`sum`/`avg`/`min`/`max` over a relation, filter on them, and sort by them:
+  ```
+  GET /users?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]&having={"postCount":{"$gt":5}}&order={"postCount":"DESC"}
+  ```
+- **New operators.** `$ieq` (case-insensitive equality), `$exists` / `$notExists`
+  (relation existence).
+- **Custom operators.** `WhereOperatorRegistry.register(token, handler)` to add your
+  own without forking.
+- **Service extension points.** Override `createFindQueryBuilder()` /
+  `createAggregateQueryBuilder()` in a subclass.
+- **Client builder.** `.addAggregate()`, `.having()`, `.removeAggregate()`.
+
+One behaviour tightening to be aware of: in an **aggregate** query, an unknown
+`order` key now returns `400` (only aggregate aliases and root columns are
+sortable). Plain (non-aggregate) queries are unchanged. An explicit `select` now
+always includes the primary key so nested relations keep hydrating.
+
 ## Already supported — no change needed
 
 - **Custom / extra routes.** Add standard NestJS route methods (`@Get`, `@Post`, …)

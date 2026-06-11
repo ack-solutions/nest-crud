@@ -4,6 +4,14 @@ import { WhereObject, WhereOperatorEnum, WhereOptions } from '../types';
 import { QueryBuilderHelper } from './query-builder-helper';
 import { BadRequestException } from '@nestjs/common';
 import { QueryDebugger } from './query-debug.helper';
+import { WhereOperatorRegistry } from './where-operators';
+
+/**
+ * Resolves a where/having key to a SQL left-hand expression and whether it is
+ * allowed. WHERE uses the default (entity-column) resolver; HAVING passes one that
+ * maps aggregate aliases to a derived-table column.
+ */
+export type LhsResolver = (key: string) => { expr: string; allowed: boolean };
 
 /**
  * WhereQueryBuilder class for handling complex where conditions in TypeORM queries.
@@ -38,6 +46,14 @@ export class WhereQueryBuilder {
     private builder: SelectQueryBuilder<any>;
     private logger: QueryDebugger;
 
+    /** Default resolver: real entity columns, validated by the allowlist (used for WHERE). */
+    private get defaultResolver(): LhsResolver {
+        return (key) => ({
+            expr: this.helper.getFieldWithAlias(key),
+            allowed: this.helper.isAllowedField(key),
+        });
+    }
+
     constructor(
         private helper: QueryBuilderHelper<any>,
         logger?: QueryDebugger,
@@ -55,52 +71,10 @@ export class WhereQueryBuilder {
     }
 
     /**
-     * Convert column to text for LIKE operations in a database-agnostic way
-     */
-    private convertToText(columnName: string): string {
-        const dbType = this.helper.dbType;
-
-        switch (dbType) {
-            case 'postgres':
-            case 'postgresql':
-                return `${columnName}::text`;
-            case 'sqlite':
-            case 'better-sqlite3':
-                return `CAST(${columnName} AS TEXT)`;
-            case 'mysql':
-            case 'mariadb':
-                return `CAST(${columnName} AS CHAR)`;
-            case 'mssql':
-                return `CAST(${columnName} AS NVARCHAR(MAX))`;
-            case 'oracle':
-                return `TO_CHAR(${columnName})`;
-            default:
-                // Fallback to standard SQL CAST
-                return `CAST(${columnName} AS VARCHAR)`;
-        }
-    }
-
-    /**
-     * Generate database-specific LIKE query
-     */
-    private generateLikeQuery(columnName: string, paramName: string, isNegated: boolean = false, isCaseInsensitive: boolean = false): string {
-        const negation = isNegated ? 'NOT ' : '';
-
-        // Convert to text if explicitly requested or if doing case-insensitive search on non-PostgreSQL
-        const textColumn = this.convertToText(columnName);
-        if (isCaseInsensitive) {
-            return `LOWER(${textColumn}) ${negation}LIKE LOWER(:${paramName})`;
-        } else {
-            // Standard LIKE for case-sensitive matching
-            return `${textColumn} ${negation}LIKE :${paramName}`;
-        }
-    }
-
-    /**
      * Builds the where condition and applies it to the query builder
      * @returns The modified SelectQueryBuilder with where conditions applied
      */
-    build(whereObject: WhereOptions) {
+    build(whereObject: WhereOptions, resolver: LhsResolver = this.defaultResolver) {
         this.logger.log('Starting where build', whereObject);
         // return builder if no conditions
         if (!whereObject) {
@@ -123,7 +97,7 @@ export class WhereQueryBuilder {
         }
 
         // parse whereObject and apply to builder
-        const { query, params } = this.buildWhereQueryAndParams(whereObject);
+        const { query, params } = this.buildWhereQueryAndParams(whereObject, resolver);
 
         this.logger.log('Where clause result', { query, params });
 
@@ -138,7 +112,8 @@ export class WhereQueryBuilder {
      * @returns Object containing the SQL query string and parameters
      */
     buildWhereQueryAndParams(
-        condition: WhereObject
+        condition: WhereObject,
+        resolver: LhsResolver = this.defaultResolver,
     ): { query: string; params: Record<string, any> } {
 
         const queryParts: string[] = [];
@@ -159,7 +134,7 @@ export class WhereQueryBuilder {
 
                 const subParts: string[] = [];
                 for (const sub of value) {
-                    const { query, params: subParams } = this.buildWhereQueryAndParams(sub);
+                    const { query, params: subParams } = this.buildWhereQueryAndParams(sub, resolver);
                     if (query) {
                         subParts.push(`(${query})`);
                         Object.assign(params, subParams);
@@ -175,18 +150,32 @@ export class WhereQueryBuilder {
                 continue;
             }
 
-            // Validate the field key against the entity's columns/relations before it
-            // becomes SQL. Identifiers are quoted downstream, so this is not the only
-            // injection guard, but rejecting unknown keys returns a clean 400 instead
-            // of leaking a database error and adds a layer of defense-in-depth.
-            if (!this.helper.isAllowedField(key)) {
+            // Relation-existence operators: { posts: { $exists: true } } / { $notExists: true }.
+            // The key is a relation (not a column), so handle it before column resolution.
+            if (
+                value && typeof value === 'object' && !Array.isArray(value) &&
+                ('$exists' in value || '$notExists' in value) &&
+                this.helper.getRelationMetadata(key)
+            ) {
+                const existsClause = this.buildRelationExists(key, value);
+                if (existsClause) {
+                    queryParts.push(existsClause);
+                }
+                continue;
+            }
+
+            // Resolve the key to a SQL left-hand expression. WHERE uses the entity
+            // column resolver; HAVING passes one that maps aggregate aliases to a
+            // derived-table column. Unknown keys are rejected with a clean 400.
+            const resolved = resolver(key);
+            if (!resolved.allowed) {
                 throw new BadRequestException(`Invalid filter field: '${key}'`);
             }
+            const column = resolved.expr;
 
             // Handle comparison operators ($eq, $gt, $lt, etc.)
             if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                 for (const op in value) {
-                    const column = this.helper.getFieldWithAlias(key);
                     const val = value[op];
 
                     const { query, params: subParams } = this.parseWhereObjectToQueryAndParams(column, val, op as WhereOperatorEnum);
@@ -198,7 +187,6 @@ export class WhereQueryBuilder {
             }
             // Handle simple equality conditions
             else {
-                const column = this.helper.getFieldWithAlias(key);
                 const { query, params: subParams } = this.parseWhereObjectToQueryAndParams(column, value);
                 if (query) {
                     queryParts.push(query);
@@ -232,228 +220,31 @@ export class WhereQueryBuilder {
             value,
         });
 
-        switch (operator) {
-            // Equality operators
-            case WhereOperatorEnum.EQ:
-                return {
-                    query: `${columnName} = :${paramName}`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.NOT_EQ:
-                return {
-                    query: `${columnName} != :${paramName}`,
-                    params: { [paramName]: value }
-                };
-
-            // Comparison operators
-            case WhereOperatorEnum.GT:
-                return {
-                    query: `${columnName} > :${paramName}`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.GT_OR_EQ:
-                return {
-                    query: `${columnName} >= :${paramName}`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.LT:
-                return {
-                    query: `${columnName} < :${paramName}`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.LT_OR_EQ:
-                return {
-                    query: `${columnName} <= :${paramName}`,
-                    params: { [paramName]: value }
-                };
-
-            // Pattern matching operators - now database-agnostic
-            case WhereOperatorEnum.LIKE:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, false),
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.NOT_LIKE:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, true, false),
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.ILIKE:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, true),
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.NOT_ILIKE:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, true, true),
-                    params: { [paramName]: value }
-                };
-
-            // Prefix/Suffix matching operators
-            case WhereOperatorEnum.STARTS_WITH:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, false),
-                    params: { [paramName]: `${value}%` }
-                };
-            case WhereOperatorEnum.ENDS_WITH:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, false),
-                    params: { [paramName]: `%${value}` }
-                };
-            case WhereOperatorEnum.ISTARTS_WITH:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, true),
-                    params: { [paramName]: `${value}%` }
-                };
-            case WhereOperatorEnum.IENDS_WITH:
-                return {
-                    query: this.generateLikeQuery(columnName, paramName, false, true),
-                    params: { [paramName]: `%${value}` }
-                };
-
-            // Case-insensitive array operators
-            case WhereOperatorEnum.IN_L:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 0',
-                        params: {}
-                    }; // Always false for empty IN clause
-                } else {
-                    const textColumn = this.convertToText(columnName);
-                    return {
-                        query: `LOWER(${textColumn}) IN (:...${paramName})`,
-                        params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
-                    };
-                }
-            case WhereOperatorEnum.NOT_IN_L:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 1',
-                        params: {}
-                    }; // NOT IN an empty set matches everything
-                } else {
-                    const textColumn = this.convertToText(columnName);
-                    return {
-                        query: `LOWER(${textColumn}) NOT IN (:...${paramName})`,
-                        params: { [paramName]: value.map((v: any) => String(v).toLowerCase()) }
-                    };
-                }
-
-            // Array operators
-            case WhereOperatorEnum.IN:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 0',
-                        params: {}
-                    }; // Always false for empty IN clause
-                }
-                return {
-                    query: `${columnName} IN (:...${paramName})`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.NOT_IN:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 1',
-                        params: {}
-                    }; // NOT IN an empty set matches everything
-                }
-                return {
-                    query: `${columnName} NOT IN (:...${paramName})`,
-                    params: { [paramName]: value }
-                };
-
-            // PostgreSQL array operators
-            case WhereOperatorEnum.CONT_ARR:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 0',
-                        params: {}
-                    }; // Always false for empty array
-                }
-                if (this.helper.dbType !== 'postgres' && this.helper.dbType !== 'postgresql') {
-                    throw new BadRequestException(`Operator ${operator} is only supported for PostgreSQL`);
-                }
-                return {
-                    query: `${columnName} @> ARRAY[:...${paramName}]::text[]`,
-                    params: { [paramName]: value }
-                };
-            case WhereOperatorEnum.INTERSECTS_ARR:
-                if (!Array.isArray(value)) {
-                    throw new BadRequestException(`Operator ${operator} requires an array value`);
-                }
-                if (value.length === 0) {
-                    return {
-                        query: '1 = 0',
-                        params: {}
-                    }; // Always false for empty array
-                }
-                if (this.helper.dbType !== 'postgres' && this.helper.dbType !== 'postgresql') {
-                    throw new BadRequestException(`Operator ${operator} is only supported for PostgreSQL`);
-                }
-                return {
-                    query: `${columnName} && ARRAY[:...${paramName}]::text[]`,
-                    params: { [paramName]: value }
-                };
-
-            // Null operators
-            case WhereOperatorEnum.IS_NULL:
-                return {
-                    query: `${columnName} IS NULL`,
-                    params: {}
-                };
-            case WhereOperatorEnum.IS_NOT_NULL:
-                return {
-                    query: `${columnName} IS NOT NULL`,
-                    params: {}
-                };
-
-            // Range operators
-            case WhereOperatorEnum.BETWEEN:
-            case WhereOperatorEnum.NOT_BETWEEN: {
-                if (!Array.isArray(value) || value.length !== 2) {
-                    throw new BadRequestException(`Operator ${operator} requires a [start, end] array value`);
-                }
-                const [start, end] = value as any;
-                const isBetween = operator === WhereOperatorEnum.BETWEEN;
-                return {
-                    query: `${columnName} ${isBetween ? 'BETWEEN' : 'NOT BETWEEN'} :${paramName}_0 AND :${paramName}_1`,
-                    params: {
-                        [`${paramName}_0`]: start,
-                        [`${paramName}_1`]: end,
-                    }
-                };
-            }
-
-            // Boolean operators
-            case WhereOperatorEnum.IS_TRUE:
-                return {
-                    query: `${columnName} IS TRUE`,
-                    params: {}
-                };
-            case WhereOperatorEnum.IS_FALSE:
-                return {
-                    query: `${columnName} IS FALSE`,
-                    params: {}
-                };
-
-            default:
-                throw new BadRequestException(`Unsupported operator: ${operator}`);
+        const handler = WhereOperatorRegistry.get(operator);
+        if (!handler) {
+            throw new BadRequestException(`Unsupported operator: ${operator}`);
         }
+
+        return handler({
+            column: columnName,
+            value,
+            param: paramName,
+            operator,
+            dbType: this.helper.dbType,
+        });
+    }
+
+    /**
+     * Build an `EXISTS` / `NOT EXISTS` clause for a relation key:
+     *   `{ posts: { $exists: true } }`    → `EXISTS (SELECT 1 FROM posts p WHERE p.userId = root.id)`
+     *   `{ posts: { $notExists: true } }` → `NOT EXISTS (...)`
+     * `$exists: false` is equivalent to `$notExists: true`.
+     */
+    private buildRelationExists(relationKey: string, value: any): string {
+        const { table, alias, condition } = this.helper.correlation(relationKey);
+        const quote = this.helper.getIdentifierQuote();
+        const wantExists = '$exists' in value ? value.$exists !== false : value.$notExists === false;
+        const keyword = wantExists ? 'EXISTS' : 'NOT EXISTS';
+        return `${keyword} (SELECT 1 FROM ${quote}${table}${quote} ${quote}${alias}${quote} WHERE ${condition})`;
     }
 }

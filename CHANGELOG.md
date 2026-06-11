@@ -4,6 +4,47 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] — unreleased (v2 track)
+
+**Additive and non-breaking** over `2.0.0` — no code changes required to upgrade.
+Advanced querying: per-row aggregates, `having`, more operators, and extension
+points. See [Querying → Aggregates](./docs/querying.md#aggregates).
+
+### Added
+
+- **Aggregates** on list endpoints: `aggregates=[{ fn, field, as }]` attaches a
+  `count` / `sum` / `avg` / `min` / `max` over a relation to each row. Implemented
+  as correlated scalar subqueries (no row-multiplication) executed in two phases
+  (compute keys + aggregates → reload entities by id), robust on
+  Postgres / MySQL / SQLite.
+- **`having`** — filter on aggregate aliases using the same operator syntax as
+  `where`; `total` reflects the filter and is independent of pagination.
+- **Order by aggregate alias** (alongside root columns).
+- **New operators**: `$ieq` (case-insensitive equality), `$exists` / `$notExists`
+  (relation existence).
+- **Custom-operator registry** — `WhereOperatorRegistry.register()` /
+  `unregister()` to add operators without forking.
+- **Service extension points** — overridable `createFindQueryBuilder()` and
+  `createAggregateQueryBuilder()`.
+- Client builder (`@ackplus/nest-crud-request`): `addAggregate()`, `having()` /
+  `andHaving()` / `orHaving()`, and `removeAggregate()`; aggregates / having are
+  serialised in `toObject()` / `toJson()`.
+
+### Changed
+
+- An explicit `select` now always includes the entity's primary key, so nested
+  relations hydrate and entity identity is preserved when `select` omits the id.
+- The 23-operator `where` builder was refactored to a registry (behaviour and
+  emitted SQL are identical for existing operators).
+
+### Notes
+
+- Order keys in an **aggregate** query are restricted to aggregate aliases and
+  root columns; an unknown key returns `400` (the non-aggregate path is unchanged).
+- Aggregates cover single-level relations; many-to-many is not yet supported.
+
+---
+
 ## [2.0.0] — unreleased (v2 track)
 
 Breaking — see [MIGRATION.md](./MIGRATION.md). Includes everything below plus:

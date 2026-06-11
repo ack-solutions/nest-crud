@@ -1,4 +1,5 @@
 import {
+    AggregateSpec,
     OrderDirectionEnum,
     RelationOptions,
     WhereOptions
@@ -104,6 +105,10 @@ export interface IFindManyOptions {
     order?: Record<string, OrderDirectionEnum>;
     where?: WhereOptions;
     select?: string[];
+    /** Computed aggregates attached to each row (count/sum/avg/min/max over a relation). */
+    aggregates?: AggregateSpec[];
+    /** Filter on aggregate aliases (same operator syntax as `where`), e.g. `{ postCount: { $gt: 5 } }`. */
+    having?: WhereOptions;
     onlyDeleted?: boolean;
     withDeleted?: boolean;
     [extraQueryParams: string]: any;

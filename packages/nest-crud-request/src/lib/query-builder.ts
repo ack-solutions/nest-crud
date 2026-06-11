@@ -1,5 +1,5 @@
 import { RelationBuilder } from './relation-builder';
-import { QueryBuilderOptions, OrderDirectionEnum } from './types';
+import { QueryBuilderOptions, OrderDirectionEnum, AggregateSpec } from './types';
 import { deepMerge } from './utils';
 import { WhereBuilder, WhereBuilderCondition } from './where-builder';
 
@@ -9,6 +9,8 @@ export class QueryBuilder {
     private options: QueryBuilderOptions = {};
 
     private whereBuilder: WhereBuilder = new WhereBuilder();
+
+    private havingBuilder: WhereBuilder = new WhereBuilder();
 
     private relationBuilder: RelationBuilder = new RelationBuilder();
 
@@ -21,6 +23,7 @@ export class QueryBuilder {
     setOptions(options: QueryBuilderOptions): this {
         this.options = options;
         this.whereBuilder = new WhereBuilder(options.where);
+        this.havingBuilder = new WhereBuilder(options.having);
         this.relationBuilder = new RelationBuilder(options.relations);
         return this;
     }
@@ -94,6 +97,42 @@ export class QueryBuilder {
             this.options.order = {};
         }
         this.options.order[orderBy] = order;
+        return this;
+    }
+
+    /**
+     * Add a per-row aggregate over a relation, e.g.
+     * `.addAggregate({ fn: 'count', field: 'posts.id', as: 'postCount' })`.
+     * The alias can then be used with `.having(...)` and `.addOrder(...)`.
+     */
+    addAggregate(aggregate: AggregateSpec): this {
+        if (!Array.isArray(this.options.aggregates)) {
+            this.options.aggregates = [];
+        }
+        this.options.aggregates.push(aggregate);
+        return this;
+    }
+
+    removeAggregate(as: string): this {
+        if (Array.isArray(this.options.aggregates)) {
+            this.options.aggregates = this.options.aggregates.filter((a) => a.as !== as);
+        }
+        return this;
+    }
+
+    /** Filter on an aggregate alias — same operator syntax as `where`. */
+    having(...args: WhereBuilderCondition): this {
+        this.havingBuilder.where(...args);
+        return this;
+    }
+
+    andHaving(...args: WhereBuilderCondition): this {
+        this.havingBuilder.andWhere(...args);
+        return this;
+    }
+
+    orHaving(...args: WhereBuilderCondition): this {
+        this.havingBuilder.orWhere(...args);
         return this;
     }
 
@@ -172,6 +211,24 @@ export class QueryBuilder {
             }
         } else {
             delete options.select;
+        }
+
+        // Serialise aggregates (JSON string unless emitting nested objects)
+        if (Array.isArray(this.options.aggregates) && this.options.aggregates.length > 0) {
+            options.aggregates = constrainToNestedObject
+                ? this.options.aggregates
+                : JSON.stringify(this.options.aggregates);
+        } else {
+            delete options.aggregates;
+        }
+
+        // Convert having conditions like where (the builder is the source of truth)
+        if (this.havingBuilder.hasConditions()) {
+            options.having = constrainToNestedObject
+                ? this.havingBuilder.toObject()
+                : JSON.stringify(this.havingBuilder.toObject());
+        } else {
+            delete options.having;
         }
 
         return options;

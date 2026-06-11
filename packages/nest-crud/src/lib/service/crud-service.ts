@@ -4,6 +4,7 @@ import { FindOptionsWhere, In, Repository, SaveOptions, SelectQueryBuilder } fro
 import type { DeepPartial } from 'typeorm';
 
 import { BaseEntity } from '../base-entity';
+import { AggregateQueryBuilder } from '../helper/aggregate-query-builder';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
@@ -396,7 +397,13 @@ export class CrudService<T extends BaseEntity> {
         const parsedOptions = RequestQueryParser.parse(query || {});
         applyListPagination(parsedOptions, crudOptions);
 
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        // Aggregate path: user-defined count/sum/avg/min/max over relations, with
+        // optional HAVING/order on the aggregate aliases (two-phase derived table).
+        if (AggregateQueryBuilder.has(parsedOptions)) {
+            return this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+        }
+
+        let queryBuilder = this.createFindQueryBuilder();
 
         let builder = queryBuilder.build(parsedOptions);
         builder = await this.beforeFindMany(builder, query);
@@ -422,11 +429,34 @@ export class CrudService<T extends BaseEntity> {
         const parsedOptions = RequestQueryParser.parse(query || {});
         applyNoPaginationLimit(parsedOptions, crudOptions);
 
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        if (AggregateQueryBuilder.has(parsedOptions)) {
+            const { items } = await this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+            return items;
+        }
+
+        let queryBuilder = this.createFindQueryBuilder();
 
         let builder = queryBuilder.build(parsedOptions);
         builder = await this.beforeFindMany(builder, query);
         return builder.getMany();
+    }
+
+    /**
+     * Factory for the list query builder. Override in a subclass to customise how
+     * filtering / relations / select are turned into SQL (the standard extension
+     * point alongside the `beforeFindMany` hook).
+     */
+    protected createFindQueryBuilder(): FindQueryBuilder<T> {
+        return new FindQueryBuilder(this.repository);
+    }
+
+    /**
+     * Factory for the aggregate (two-phase) query builder. Override to customise the
+     * aggregate execution. Note: `beforeFindMany` is not applied on the aggregate
+     * path — override this instead.
+     */
+    protected createAggregateQueryBuilder(): AggregateQueryBuilder<T> {
+        return new AggregateQueryBuilder(this.repository);
     }
 
     /**
@@ -448,7 +478,7 @@ export class CrudService<T extends BaseEntity> {
         sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        let queryBuilder = this.createFindQueryBuilder();
         let query = queryBuilder.build(parsedOptions);
         query = await this.beforeCounts(query);
 

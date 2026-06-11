@@ -10,6 +10,7 @@ export * from './lib/interface/typeorm';
 export * from './lib/service/crud-service';
 export * from './lib/helper/find-query-builder';
 export * from './lib/helper/request-query-parser';
+export * from './lib/helper/where-operators';
 
 // Base Entity
 export * from './lib/base-entity';
