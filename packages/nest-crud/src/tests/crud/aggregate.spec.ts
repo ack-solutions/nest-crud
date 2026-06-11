@@ -180,4 +180,49 @@ describe('Aggregates (count/sum/avg/min/max) — two-phase derived table', () =>
         expect(result.total).toBe(2);
         expect(result.items.map((u) => (u as any).postCount)).toEqual([2, 1]);
     });
+
+    // John: 2 posts (published likes 10, draft likes 5). Jane: 1 post (published likes 20).
+    it('per-aggregate where filters the related rows (same operators as where)', async () => {
+        const { items } = await agg().getManyAndCount({
+            aggregates: [
+                { fn: 'count', field: 'posts.id', as: 'allPosts' },
+                { fn: 'count', field: 'posts.id', as: 'publishedPosts', where: { status: 'published' } },
+                { fn: 'sum', field: 'posts.likes', as: 'publishedLikes', where: { status: 'published' } },
+                { fn: 'count', field: 'posts.id', as: 'popularPosts', where: { likes: { $gt: 6 } } },
+                { fn: 'count', field: 'posts.id', as: 'draftPosts', where: { status: 'draft' } },
+            ],
+            order: { name: OrderDirectionEnum.ASC },
+        });
+
+        const john = items.find((u) => u.name === 'John Doe') as any;
+        const jane = items.find((u) => u.name === 'Jane Smith') as any;
+
+        expect([john.allPosts, john.publishedPosts, john.publishedLikes, john.popularPosts, john.draftPosts]).toEqual([2, 1, 10, 1, 1]);
+        expect([jane.allPosts, jane.publishedPosts, jane.publishedLikes, jane.popularPosts, jane.draftPosts]).toEqual([1, 1, 20, 1, 0]);
+    });
+
+    it('a filtered aggregate works with HAVING, and an unknown aggregate-where field is rejected', async () => {
+        const { total } = await agg().getManyAndCount({
+            aggregates: [{ fn: 'count', field: 'posts.id', as: 'published', where: { status: 'published' } }],
+            having: { published: { $gte: 1 } },
+        });
+        expect(total).toBe(2); // both John and Jane have a published post
+
+        await expect(
+            agg().getManyAndCount({
+                aggregates: [{ fn: 'count', field: 'posts.id', as: 'x', where: { notAColumn: 'y' } }],
+            }),
+        ).rejects.toThrow();
+    });
+
+    it('the aggregate where survives HTTP-style JSON params', async () => {
+        const service = new CrudService<User>(repo);
+        const result = await service.findMany({
+            aggregates: JSON.stringify([{ fn: 'count', field: 'posts.id', as: 'published', where: { status: 'published' } }]),
+            order: JSON.stringify({ name: 'ASC' }),
+        } as any);
+
+        const john = result.items.find((u) => u.name === 'John Doe') as any;
+        expect(john.published).toBe(1); // 1 of John's 2 posts is published
+    });
 });

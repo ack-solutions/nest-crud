@@ -77,6 +77,8 @@ export interface AggregateSpec {
     field: string;
     as: string;
     distinct?: boolean;
+    /** Optional filter on the related rows — same operator syntax as `where`. */
+    where?: WhereOptions;
 }
 
 // QueryBuilderOptions is specific to nest-crud-request

@@ -168,4 +168,21 @@ describePg('Complex queries via QueryBuilder (real Postgres)', () => {
     expect(body.total).toBe(9); // User01..User09 (User10 is "User10", not "User0*")
     expect(body.items.map((u) => u.firstName)).toEqual(['User01', 'User02', 'User03']);
   });
+
+  it('per-aggregate where via the builder (count only high-engagement posts)', async () => {
+    const qb = new QueryBuilder()
+      .addAggregate({ fn: AggregateFnEnum.COUNT, field: 'posts.id', as: 'allPosts' })
+      .addAggregate({ fn: AggregateFnEnum.COUNT, field: 'posts.id', as: 'bigPosts', where: { likes: { $gte: 20 } } })
+      .having('allPosts', WhereOperatorEnum.GT, 0)
+      .addOrder('allPosts', OrderDirectionEnum.DESC);
+
+    const body = await runUsers(qb);
+
+    // Posts/likes: User01 [10,20,30], User02 [10,20], User03 [10]. bigPosts (likes>=20): 2/1/0.
+    expect(body.items.map((u) => [u.firstName, Number(u.allPosts), Number(u.bigPosts)])).toEqual([
+      ['User01', 3, 2],
+      ['User02', 2, 1],
+      ['User03', 1, 0],
+    ]);
+  });
 });

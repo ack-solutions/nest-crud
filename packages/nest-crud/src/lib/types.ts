@@ -78,4 +78,11 @@ export interface AggregateSpec {
     field: string;
     as: string;
     distinct?: boolean;
+    /**
+     * Optional filter on the related rows, using the **same operator syntax as
+     * `where`** (`$eq`, `$gt`, `$in`, `$like`, `$between`, `$and`/`$or`, …). Keys
+     * are columns of the related entity. E.g. count only published posts:
+     * `{ fn: 'count', field: 'posts.id', as: 'publishedCount', where: { status: 'published' } }`.
+     */
+    where?: WhereOptions;
 }

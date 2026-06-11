@@ -355,12 +355,15 @@ const params = new QueryBuilder()
 ```ts
 interface AggregateSpec {
   fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
-  field: string;   // relation-qualified, e.g. 'posts.id'
-  as: string;      // alias; used by having() and addOrder()
-  distinct?: boolean; // COUNT(DISTINCT …)
+  field: string;       // relation-qualified, e.g. 'posts.id'
+  as: string;          // alias; used by having() and addOrder()
+  distinct?: boolean;  // COUNT(DISTINCT …)
+  where?: WhereOptions; // filter the related rows — same operators as where
 }
 ```
 
+- `where` on an aggregate filters only the related rows it counts/sums (e.g. count
+  only published posts): `addAggregate({ fn: 'count', field: 'posts.id', as: 'published', where: { status: 'published' } })`.
 - `having(...)` / `andHaving(...)` / `orHaving(...)` take the same call shapes as
   `where(...)`, but the key is an aggregate **alias** (e.g. `postCount`).
 - `removeAggregate(alias)` drops one.
@@ -501,9 +504,10 @@ enum AggregateFnEnum { COUNT = 'count', SUM = 'sum', AVG = 'avg', MIN = 'min', M
 
 interface AggregateSpec {
   fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
-  field: string;       // relation-qualified path, e.g. 'posts.id'
-  as: string;          // alias used by having() / addOrder()
+  field: string;        // relation-qualified path, e.g. 'posts.id'
+  as: string;           // alias used by having() / addOrder()
   distinct?: boolean;
+  where?: WhereOptions; // filter the related rows (same operators as where)
 }
 
 type RelationObjectValue = {

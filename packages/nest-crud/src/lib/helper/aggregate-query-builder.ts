@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ObjectLiteral, Repository } from 'typeorm';
 
 import { IFindManyOptions } from '../interface/crud';
-import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions } from '../types';
+import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions, WhereOptions } from '../types';
 import { QueryBuilderHelper } from './query-builder-helper';
 import { JoinQueryBuilder } from './join-query-builder';
 import { WhereQueryBuilder, LhsResolver } from './where-query-builder';
@@ -91,8 +91,24 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
             );
         }
 
-        for (const c of compiled) {
-            inner.addSelect(`(${c.sql})`, c.as);
+        // Add each aggregate subquery, splicing in an optional per-aggregate `where`
+        // (filters the related rows using the same operator engine as a normal where).
+        const aggParams: Record<string, any> = {};
+        const specs = options.aggregates || [];
+        for (let i = 0; i < compiled.length; i++) {
+            const c = compiled[i];
+            let subquery = c.sql;
+            if (specs[i].where) {
+                const filter = this.compileAggregateWhere(helper, c, specs[i].where as WhereOptions);
+                if (filter.query) {
+                    subquery = `${c.sql} AND (${filter.query})`;
+                    Object.assign(aggParams, filter.params);
+                }
+            }
+            inner.addSelect(`(${subquery})`, c.as);
+        }
+        if (Object.keys(aggParams).length) {
+            inner.setParameters({ ...inner.getParameters(), ...aggParams });
         }
 
         // Collapse any join fan-out; scalar subqueries and root columns stay valid
@@ -182,6 +198,39 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
         }
 
         return { items, total };
+    }
+
+    /**
+     * Compile a per-aggregate `where` against the related rows using the same
+     * operator engine as a normal `where`. Filter keys are columns of the related
+     * entity (hidden ones excluded); the resolver maps each to the subquery's child
+     * alias. A unique param prefix avoids collisions across aggregates and the
+     * outer query.
+     */
+    private compileAggregateWhere(
+        helper: QueryBuilderHelper<T>,
+        compiled: { as: string; alias: string; relationPath: string },
+        where: WhereOptions,
+    ): { query: string; params: Record<string, any> } {
+        const relation = this.repository.metadata.relations.find((r) => r.propertyName === compiled.relationPath);
+        const childMeta = relation?.inverseEntityMetadata;
+        const hidden = helper.relationHiddenFields(compiled.relationPath);
+        const quote = helper.getIdentifierQuote();
+
+        const resolver: LhsResolver = (key) => {
+            if (hidden.has(key)) {
+                return { expr: '', allowed: false };
+            }
+            const col = childMeta?.columns.find((c) => c.propertyName === key || c.propertyPath === key);
+            if (!col) {
+                return { expr: '', allowed: false };
+            }
+            return { expr: `${quote}${compiled.alias}${quote}.${quote}${col.databaseName}${quote}`, allowed: true };
+        };
+
+        const wb = new WhereQueryBuilder(helper);
+        wb.setParamsPrefix(`agg_${compiled.as}_param_`);
+        return wb.buildWhereQueryAndParams(where, resolver);
     }
 
     /** Coerce a raw aggregate value: numbers for count/sum/avg (+ numeric min/max), else verbatim. */

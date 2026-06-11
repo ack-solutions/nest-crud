@@ -349,7 +349,7 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
      * (`count`/`sum`/`avg`, and `min`/`max` over a numeric column; `min`/`max` over a
      * date/string column are returned verbatim).
      */
-    public compileAggregate(spec: AggregateSpec): { as: string; sql: string; numeric: boolean } {
+    public compileAggregate(spec: AggregateSpec): { as: string; sql: string; numeric: boolean; alias: string; relationPath: string } {
         if (!spec || typeof spec.as !== 'string' || typeof spec.field !== 'string') {
             throw new BadRequestException('Invalid aggregate spec');
         }
@@ -383,8 +383,10 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
         }
 
         const expr = fn === 'count' || fn === 'sum' ? `COALESCE(${inner}, 0)` : inner;
+        // The subquery ends in its correlation WHERE; an optional per-aggregate
+        // filter is appended (as ` AND (...)`) by the AggregateQueryBuilder.
         const sql = `SELECT ${expr} FROM ${quote}${table}${quote} ${quote}${alias}${quote} WHERE ${condition}`;
-        return { as: spec.as, sql, numeric: this.isNumericAggregate(fn, relationPath, column) };
+        return { as: spec.as, sql, numeric: this.isNumericAggregate(fn, relationPath, column), alias, relationPath };
     }
 
     /** Whether an aggregate's raw result should be coerced to a JS number. */

@@ -17,6 +17,11 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   as correlated scalar subqueries (no row-multiplication) executed in two phases
   (compute keys + aggregates → reload entities by id), robust on
   Postgres / MySQL / SQLite.
+- **Per-aggregate `where`** — an `AggregateSpec` can carry its own `where` to
+  filter the related rows it counts/sums (e.g. count only published posts), using
+  the same operator engine as the top-level `where`. Appended inside that
+  aggregate's correlated subquery, so aggregates stay independent; unknown/hidden
+  columns are rejected with `400`. Exposed on the client `addAggregate({ …, where })`.
 - **`having`** — filter on aggregate aliases using the same operator syntax as
   `where`; `total` reflects the filter and is independent of pagination.
 - **Order by aggregate alias** (alongside root columns).

@@ -272,6 +272,27 @@ Each aggregate is a **correlated subquery**, so adding several aggregates — or
 joining the same relation via `relations` — never inflates the numbers. Pass
 `distinct: true` for `COUNT(DISTINCT …)`.
 
+### Filtering an aggregate — per-aggregate `where`
+
+Add a `where` to an aggregate spec to count/sum **only the related rows that
+match** — using the **same operators as the top-level `where`**. The keys are
+columns of the related entity:
+
+```bash
+# postCount = all posts; publishedCount = only published; bigSpenders = likes > 100
+GET /users?aggregates=[
+  {"fn":"count","field":"posts.id","as":"postCount"},
+  {"fn":"count","field":"posts.id","as":"publishedCount","where":{"status":"published"}},
+  {"fn":"sum","field":"posts.likes","as":"hotLikes","where":{"likes":{"$gt":100}}}
+]
+```
+
+The filter is appended inside that aggregate's subquery
+(`… WHERE posts.userId = user.id AND (posts.status = :p)`), so the aggregates stay
+independent. Every operator works — `$gt`, `$in`, `$like`, `$between`, `$and` /
+`$or`, etc. Unknown or hidden columns in an aggregate `where` are rejected with a
+`400`.
+
 Several aggregates at once, returned alongside the joined relation:
 
 ```bash
