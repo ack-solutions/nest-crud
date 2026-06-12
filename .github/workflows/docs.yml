@@ -45,7 +45,11 @@ jobs:
         run: pnpm docs:build
 
       - name: Configure Pages
+        # enablement: true turns on GitHub Pages (Actions source) if it isn't already,
+        # so the first deploy doesn't fail with "Get Pages site failed / Not Found".
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

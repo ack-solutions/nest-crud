@@ -1,5 +1,15 @@
 # @ackplus/nest-crud
 
+> **Part of the [nest-crud](https://github.com/ack-solutions/nest-crud) family** — one server + two query-builder clients, released together at the same version:
+>
+> | Package | Get it | Docs |
+> | --- | --- | --- |
+> | **`@ackplus/nest-crud`** — NestJS + TypeORM server · _this package_ | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud) | [Getting started](https://ack-solutions.github.io/nest-crud/getting-started) |
+> | **`@ackplus/nest-crud-request`** — JS / TS query builder | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud-request) | [Client guide](https://ack-solutions.github.io/nest-crud/querying#client-query-builder) |
+> | **`nest_crud_request`** — Dart / Flutter query builder | [📦 pub.dev](https://pub.dev/packages/nest_crud_request) | [Flutter guide](https://ack-solutions.github.io/nest-crud/frameworks/flutter) |
+>
+> 📖 **Full documentation:** <https://ack-solutions.github.io/nest-crud/> · 🧩 [All packages](https://ack-solutions.github.io/nest-crud/packages) · 💻 [GitHub](https://github.com/ack-solutions/nest-crud)
+
 CRUD route generator for **NestJS + TypeORM**. One decorator turns a controller into a full REST resource with filtering, relations, select, sorting, pagination, bulk ops, soft-delete, and Swagger metadata.
 
 - One decorator: `@Crud()`
@@ -70,10 +80,10 @@ Declared peer ranges:
 
 Want a type-safe client for these routes?
 
-- **JS / TS** (React, Angular, Vue, Node): [`@ackplus/nest-crud-request`](../nest-crud-request/README.md) ([npm](https://www.npmjs.com/package/@ackplus/nest-crud-request))
-- **Flutter / Dart**: [`nest_crud_request`](../../clients/flutter/nest_crud_request/README.md) ([pub.dev](https://pub.dev/packages/nest_crud_request))
+- **JS / TS** (React, Angular, Vue, Node): [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request) · [client guide](https://ack-solutions.github.io/nest-crud/querying#client-query-builder)
+- **Flutter / Dart**: [`nest_crud_request`](https://pub.dev/packages/nest_crud_request) · [Flutter guide](https://ack-solutions.github.io/nest-crud/frameworks/flutter)
 
-Both build the exact same query format and publish together at one version. See [all packages](../../docs/packages.md).
+Both build the exact same query format and publish together at one version. See [all packages](https://ack-solutions.github.io/nest-crud/packages).
 
 ---
 
@@ -719,7 +729,7 @@ curl -G http://localhost:3000/users \
 GET /users?where[isActive][$eq]=true&order[createdAt]=DESC&take=10
 ```
 
-If you'd rather not assemble strings by hand, install [`@ackplus/nest-crud-request`](../nest-crud-request/README.md) and use `QueryBuilder`.
+If you'd rather not assemble strings by hand, install [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request) and use `QueryBuilder`.
 
 ---
 
@@ -735,7 +745,7 @@ If you'd rather not assemble strings by hand, install [`@ackplus/nest-crud-reque
 
 ## Example app
 
-A working NestJS app is in [`apps/example-app`](../../apps/example-app).
+A working NestJS app is in [`apps/example-app`](https://github.com/ack-solutions/nest-crud/tree/main/apps/example-app).
 
 ## License
 

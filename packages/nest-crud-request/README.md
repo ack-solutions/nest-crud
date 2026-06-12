@@ -1,5 +1,15 @@
 # @ackplus/nest-crud-request
 
+> **Part of the [nest-crud](https://github.com/ack-solutions/nest-crud) family** — one server + two query-builder clients, released together at the same version:
+>
+> | Package | Get it | Docs |
+> | --- | --- | --- |
+> | **`@ackplus/nest-crud`** — NestJS + TypeORM server | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud) | [Getting started](https://ack-solutions.github.io/nest-crud/getting-started) |
+> | **`@ackplus/nest-crud-request`** — JS / TS query builder · _this package_ | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud-request) | [Client guide](https://ack-solutions.github.io/nest-crud/querying#client-query-builder) |
+> | **`nest_crud_request`** — Dart / Flutter query builder | [📦 pub.dev](https://pub.dev/packages/nest_crud_request) | [Flutter guide](https://ack-solutions.github.io/nest-crud/frameworks/flutter) |
+>
+> 📖 **Full documentation:** <https://ack-solutions.github.io/nest-crud/> · 🧩 [All packages](https://ack-solutions.github.io/nest-crud/packages) · 💻 [GitHub](https://github.com/ack-solutions/nest-crud)
+
 Framework-agnostic query builder for REST APIs that follow the `@ackplus/nest-crud` request format. Write filters, relations, select, order, and pagination with a fluent, type-safe API — no string gymnastics, no duplicated logic between frontend and backend.
 
 Works in **React, Angular, Vue, Node.js**, and any TypeScript environment. Zero runtime dependencies beyond `tslib`.
@@ -541,7 +551,7 @@ type WhereBuilderCondition =
 - No built-in query-string serializer — pipe `toObject()` through `URLSearchParams`, `qs`, or your HTTP client's `params` option.
 - Doesn't validate server-side operators — you can build filters the server rejects if you mix operators and column types carelessly.
 
-For the matching backend, see [`@ackplus/nest-crud`](../nest-crud/README.md).
+For the matching backend, see [`@ackplus/nest-crud`](https://www.npmjs.com/package/@ackplus/nest-crud).
 
 ---
 
@@ -549,12 +559,12 @@ For the matching backend, see [`@ackplus/nest-crud`](../nest-crud/README.md).
 
 | Package | Registry | For |
 | --- | --- | --- |
-| [`@ackplus/nest-crud`](../nest-crud/README.md) | [npm](https://www.npmjs.com/package/@ackplus/nest-crud) | The NestJS + TypeORM server |
-| [`nest_crud_request`](../../clients/flutter/nest_crud_request/README.md) | [pub.dev](https://pub.dev/packages/nest_crud_request) | The Dart/Flutter twin of this builder |
+| [`@ackplus/nest-crud`](https://www.npmjs.com/package/@ackplus/nest-crud) | [npm](https://www.npmjs.com/package/@ackplus/nest-crud) | The NestJS + TypeORM server |
+| [`nest_crud_request`](https://pub.dev/packages/nest_crud_request) | [pub.dev](https://pub.dev/packages/nest_crud_request) | The Dart/Flutter twin of this builder |
 
 This package and its Dart twin produce an **identical wire format** and publish
 together at one version. Full docs: <https://ack-solutions.github.io/nest-crud/> ·
-[all packages](../../docs/packages.md).
+[all packages](https://ack-solutions.github.io/nest-crud/packages).
 
 ---
 
