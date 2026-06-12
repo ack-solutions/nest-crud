@@ -357,15 +357,16 @@ export class CrudService<T extends BaseEntity> {
             const savedEntities = await manager.save<T>(entities as T[], saveOptions);
 
             // Reload so generated columns / DB defaults / relations are present,
-            // matching the single create() behaviour.
+            // matching the single create() behaviour. One IN(...) query (not N
+            // concurrent ones) — concurrent queries on a transaction's single
+            // connection are deprecated in pg and removed in pg@9.
             const primaryKey = this.repository.metadata.primaryColumns[0].propertyName;
-            const reloaded = await Promise.all(
-                savedEntities.map((saved: any) =>
-                    manager.findOneByOrFail(this.repository.target as any, {
-                        [primaryKey]: saved[primaryKey],
-                    }),
-                ),
-            ) as T[];
+            const ids = savedEntities.map((saved: any) => saved[primaryKey]);
+            const found = await manager.find(this.repository.target as any, {
+                where: { [primaryKey]: In(ids) },
+            }) as T[];
+            const byId = new Map(found.map((e: any) => [String(e[primaryKey]), e]));
+            const reloaded = savedEntities.map((saved: any) => byId.get(String(saved[primaryKey])) ?? saved) as T[];
 
             for (let i = 0; i < reloaded.length; i++) {
                 await this.afterSave(reloaded[i], null, data.bulk[i]);

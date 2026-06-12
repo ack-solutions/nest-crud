@@ -64,6 +64,10 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
 
 ### Fixed
 
+- **`createMany` reload**: bulk-create reloaded each saved row with a separate
+  `findOneByOrFail` inside `Promise.all` — N concurrent queries on the transaction's
+  single connection, which pg deprecates (and removes in pg@9). It now reloads all
+  rows with a single `IN(...)` query (also fewer round-trips). Behaviour unchanged.
 - **`PUT /reorder` over HTTP**: the route handler passed the validated body object
   (`{ ids: [...] }`) straight to `service.reorder()` (which expects an id array),
   so with validation enabled reordering silently did nothing. The handler now
