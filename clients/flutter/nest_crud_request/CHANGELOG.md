@@ -1,4 +1,4 @@
-## 1.1.42
+## 1.2.0
 
 - Initial release. Dart / Flutter query builder for `@ackplus/nest-crud`, the twin
   of the JS `@ackplus/nest-crud-request`. Build `where` (all 29 operators + `$and`/
