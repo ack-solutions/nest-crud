@@ -118,5 +118,17 @@ jobs:
           dart pub get
           dart test
 
-      - name: Publish to pub.dev
-        run: dart pub publish --force
+      # Idempotent: the first pub.dev publish is done manually (pub.dev requires the
+      # package to exist before automated publishing can be enabled), so on that first
+      # tag the version already exists — skip instead of failing. Later tags publish
+      # normally because their version isn't on pub.dev yet.
+      - name: Publish to pub.dev (skip if this version already exists)
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"; VERSION="${VERSION#v}"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://pub.dev/api/packages/nest_crud_request/versions/${VERSION}")
+          if [ "$CODE" = "200" ]; then
+            echo "nest_crud_request ${VERSION} is already on pub.dev — skipping publish."
+          else
+            dart pub publish --force
+          fi
