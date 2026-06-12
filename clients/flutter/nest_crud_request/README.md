@@ -1,5 +1,15 @@
 # nest_crud_request (Dart / Flutter)
 
+> **Part of the [nest-crud](https://github.com/ack-solutions/nest-crud) family** — one server + two query-builder clients, released together at the same version:
+>
+> | Package | Get it | Docs |
+> | --- | --- | --- |
+> | **`@ackplus/nest-crud`** — NestJS + TypeORM server | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud) | [Getting started](https://ack-solutions.github.io/nest-crud/getting-started) |
+> | **`@ackplus/nest-crud-request`** — JS / TS query builder | [📦 npm](https://www.npmjs.com/package/@ackplus/nest-crud-request) | [Client guide](https://ack-solutions.github.io/nest-crud/querying#client-query-builder) |
+> | **`nest_crud_request`** — Dart / Flutter query builder · _this package_ | [📦 pub.dev](https://pub.dev/packages/nest_crud_request) | [Flutter guide](https://ack-solutions.github.io/nest-crud/frameworks/flutter) |
+>
+> 📖 **Full documentation:** <https://ack-solutions.github.io/nest-crud/> · 🧩 [All packages](https://ack-solutions.github.io/nest-crud/packages) · 💻 [GitHub](https://github.com/ack-solutions/nest-crud)
+
 Framework-agnostic **query builder** for [`@ackplus/nest-crud`](https://github.com/ack-solutions/nest-crud)
 REST APIs — the Dart twin of the JS [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request).
 Build filters, relations, aggregates, ordering and pagination with a fluent API,
