@@ -41,3 +41,22 @@ jobs:
 
       - name: E2E tests (example app)
         run: pnpm -C apps/example-app test:e2e
+
+  dart:
+    name: Dart query builder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Analyze + test
+        working-directory: clients/flutter/nest_crud_request
+        run: |
+          dart pub get
+          dart analyze
+          dart test

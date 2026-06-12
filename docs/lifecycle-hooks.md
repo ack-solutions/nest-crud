@@ -72,3 +72,27 @@ export class DocumentService extends CrudService<Document> {
 
 > Returning a new/modified builder is required — a scoping constraint added in
 > `beforeFindOne` is only applied because the returned builder is used.
+
+### Two rules for read hooks
+
+- **Don't call `.select()`** in `beforeFindMany` / `beforeFindOne` / `beforeCounts`.
+  The library manages the select list (columns, relations, hidden-field stripping);
+  overriding it breaks nested hydration. Use `andWhere`, `leftJoin`, `addOrderBy`,
+  `setParameter` instead.
+- **The aggregate path is separate.** When a request uses
+  [`aggregates`](./querying.md#aggregates), `findMany` runs a two-phase query and
+  `beforeFindMany` is **not** applied to it. To scope that path, override
+  `createAggregateQueryBuilder()` (see below).
+
+## Extending the query builder
+
+For changes that go beyond per-request hooks, override the builder factories on the
+service — your subclass controls construction:
+
+| Override point | Customises |
+| --- | --- |
+| `createFindQueryBuilder()` | the normal list/read query builder |
+| `createAggregateQueryBuilder()` | the two-phase aggregate execution |
+
+These are documented with examples in
+[Querying → Extending the service](./querying.md#extending-the-service).

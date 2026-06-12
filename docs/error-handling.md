@@ -20,11 +20,19 @@ For validation errors, `message` is an array of strings.
 
 ## What raises `400`
 
-- Malformed JSON in `where` / `relations` / `order` / `select`.
+- Malformed JSON in `where` / `relations` / `order` / `select` / `aggregates` / `having`.
 - An **unknown filter field** in `where` (only real columns and relation paths are allowed).
+- An **unknown `order` key** — a column/alias the query doesn't expose. (Unknown order
+  keys are rejected rather than silently ignored; see [Migration](https://github.com/ack-solutions/nest-crud/blob/main/MIGRATION.md).)
+- A [**hidden field**](./querying.md#hiding-sensitive-fields) (`@CrudHidden()` /
+  `hiddenFields`) named in `where` / `order` / `relations` / an aggregate `field`.
+  The error is identical to "unknown field" so the field's existence isn't revealed.
 - An unsupported operator, e.g. a typo like `$gtt`.
 - `$in` / `$notIn` / `$inL` / `$notinL` given a non-array value.
 - `$between` / `$notBetween` not given a `[start, end]` pair.
+- An **aggregate** with an invalid `field` (must be a relation path like `posts.id`),
+  a bad `as` alias (must match `^[A-Za-z_][A-Za-z0-9_]*$`), or one colliding with a real column.
+- A `having` key that isn't a defined aggregate alias.
 - `take` (page size) greater than `maxPerPage`.
 - An invalid `groupByKey` on `counts`.
 - An empty body on `create`.

@@ -11,7 +11,9 @@
 | `softDelete` | boolean | Enable soft-delete + the trash/restore routes. |
 | `maxPerPage` | number | Max page size for list queries (default 5000). `maxPageSize` is a legacy alias. |
 | `select` | string[] | Default columns to select when the request doesn't specify `select`. |
+| `hiddenFields` | string[] | Columns/relations to hide from the entire query surface (never selected, rejected in `where`/`order`/`aggregates`). Per-controller alternative to the [`@CrudHidden()`](./querying.md#hiding-sensitive-fields) decorator. |
 | `query.relations` | string[] | Relations always joined for this controller. |
+| `messages` | object | Override delete/restore/reorder response messages (i18n) — `{ deleted, noItemsToDelete, restored, reordered }`. |
 | `validation` | ValidationPipeOptions \| false | Options for the per-route `ValidationPipe`, or `false` to disable generated validation. |
 | `dto.create` / `dto.update` | class | Custom request-body DTOs. When omitted, a DTO derived from the entity (minus `id`/timestamps) is used. |
 | `debug` | boolean | Verbose query logging (also toggled by the `NEST_CRUD_DEBUG` env var). |
@@ -62,6 +64,41 @@ The route names are: `findMany`, `findAll`, `counts`, `findOne`, `create`,
 
 † only generated when `softDelete: true`.
 
+## Hiding sensitive fields
+
+`hiddenFields` (and the `@CrudHidden()` entity decorator) remove columns or
+relations from the generated query surface entirely — they're never returned,
+and naming one in `where` / `order` / `aggregates` / `relations` returns `400`,
+indistinguishable from an unknown field. This is a recently added security
+control; the full behaviour table and examples live in
+[Querying → Hiding sensitive fields](./querying.md#hiding-sensitive-fields).
+
+```ts
+@Crud({ entity: User, path: 'users', hiddenFields: ['passwordHash', 'auditLogs'] })
+export class UserController {
+  constructor(public service: UserService) {}
+}
+```
+
+## Response messages (i18n)
+
+Override the messages returned by delete / restore / reorder — per controller via
+`messages`, or globally via `CrudConfigService`. Any omitted key falls back to the
+English default.
+
+```ts
+@Crud({
+  entity: User,
+  path: 'users',
+  messages: {
+    deleted: 'Utilisateur supprimé',
+    restored: 'Utilisateur restauré',
+    reordered: 'Ordre mis à jour',
+    noItemsToDelete: 'Aucun élément à supprimer',
+  },
+})
+```
+
 ## Global defaults — `CrudConfigService`
 
 Set defaults for every controller once, at bootstrap:
@@ -70,7 +107,13 @@ Set defaults for every controller once, at bootstrap:
 import { CrudConfigService } from '@ackplus/nest-crud';
 
 CrudConfigService.load({
-  maxPerPage: 1000, // or the legacy `maxPageSize` alias
-  // routes: { ... } // override default route config globally
+  maxPerPage: 1000,        // or the legacy `maxPageSize` alias
+  // messages: { ... },    // default response messages for all controllers
+  // routes: { ... },      // override default route config globally
 });
 ```
+
+## See also
+
+- [Querying](./querying.md) — every operator, relations, aggregates, `having`, hiding fields.
+- [Packages & links](./packages.md) — the npm and pub.dev client builders that produce these queries.

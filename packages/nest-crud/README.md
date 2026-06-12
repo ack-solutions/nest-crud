@@ -4,8 +4,12 @@ CRUD route generator for **NestJS + TypeORM**. One decorator turns a controller 
 
 - One decorator: `@Crud()`
 - One service base class: `CrudService<T>`
-- One request format: `where`, `relations`, `select`, `order`, `take`, `skip`, `withDeleted`, `onlyDeleted`
-- 26 operators + `$and` / `$or`
+- One request format: `where`, `relations`, `select`, `order`, `aggregates`, `having`, `take`, `skip`, `withDeleted`, `onlyDeleted`
+- 29 operators + `$and` / `$or` (and a registry for custom operators)
+- Aggregates (`count`/`sum`/`avg`/`min`/`max` over relations) with `having`
+- Hide sensitive columns/relations with `@CrudHidden()` / `hiddenFields`
+
+📖 Full docs: <https://ack-solutions.github.io/nest-crud/> · 📦 [all packages](https://github.com/ack-solutions/nest-crud/blob/main/docs/packages.md)
 
 ---
 
@@ -19,18 +23,20 @@ CRUD route generator for **NestJS + TypeORM**. One decorator turns a controller 
 6. [Request query format](#request-query-format)
 7. [Where operators](#where-operators)
 8. [Relations, select, order, pagination](#relations-select-order-pagination)
-9. [Soft delete & trash](#soft-delete--trash)
-10. [Bulk operations](#bulk-operations)
-11. [Counts & grouped counts](#counts--grouped-counts)
-12. [Reorder](#reorder)
-13. [Lifecycle hooks](#lifecycle-hooks)
-14. [DTOs & validation](#dtos--validation)
-15. [Overriding generated routes](#overriding-generated-routes)
-16. [Global defaults (`CrudConfigService`)](#global-defaults-crudconfigservice)
-17. [Base entities](#base-entities)
-18. [Exported helpers](#exported-helpers)
-19. [Calling the API without the request builder](#calling-the-api-without-the-request-builder)
-20. [Known limitations](#known-limitations)
+9. [Aggregates & HAVING](#aggregates--having)
+10. [Hiding sensitive fields](#hiding-sensitive-fields)
+11. [Soft delete & trash](#soft-delete--trash)
+12. [Bulk operations](#bulk-operations)
+13. [Counts & grouped counts](#counts--grouped-counts)
+14. [Reorder](#reorder)
+15. [Lifecycle hooks](#lifecycle-hooks)
+16. [DTOs & validation](#dtos--validation)
+17. [Overriding generated routes](#overriding-generated-routes)
+18. [Global defaults (`CrudConfigService`)](#global-defaults-crudconfigservice)
+19. [Base entities](#base-entities)
+20. [Exported helpers](#exported-helpers)
+21. [Calling the API without the request builder](#calling-the-api-without-the-request-builder)
+22. [Known limitations](#known-limitations)
 
 ---
 
@@ -62,7 +68,12 @@ Declared peer ranges:
 | `class-transformer` | `^0.5.1` |
 | `reflect-metadata` | `^0.1.13` |
 
-Want a type-safe client for these routes? See [`@ackplus/nest-crud-request`](../nest-crud-request/README.md).
+Want a type-safe client for these routes?
+
+- **JS / TS** (React, Angular, Vue, Node): [`@ackplus/nest-crud-request`](../nest-crud-request/README.md) ([npm](https://www.npmjs.com/package/@ackplus/nest-crud-request))
+- **Flutter / Dart**: [`nest_crud_request`](../../clients/flutter/nest_crud_request/README.md) ([pub.dev](https://pub.dev/packages/nest_crud_request))
+
+Both build the exact same query format and publish together at one version. See [all packages](../../docs/packages.md).
 
 ---
 
@@ -149,7 +160,7 @@ Routes generated:
 | `validation` | `ValidationPipeOptions` | Passed to `new ValidationPipe(...)` |
 | `softDelete` | `boolean` | Enables `/:id/restore`, `/:id/trash`, `/restore/bulk`, `/trash/bulk` |
 | `select` | `string[]` | Default columns included in list queries |
-| `hiddenFields` | `string[]` | Columns always excluded from responses |
+| `hiddenFields` | `string[]` | Columns/relations hidden from the whole query surface — never selected, and rejected in `where`/`order`/`aggregates`/`relations`. See [Hiding sensitive fields](#hiding-sensitive-fields). Or use the `@CrudHidden()` decorator on the entity. |
 | `maxPerPage` | `number` | Cap on `take` / `limit`. Defaults to global (5000) |
 | `maxPageSize` | `number` | Legacy alias for `maxPerPage` |
 | `query` | `{ relations?: string[] }` | Default relations for list queries |
@@ -250,6 +261,8 @@ All list endpoints accept these top-level query params:
 | `relations` | JSON string / array / object | Which relations to load |
 | `select` | JSON string / array | Columns to return |
 | `order` | JSON string / object | Sort, e.g. `{ createdAt: 'DESC' }` |
+| `aggregates` | JSON string / array | Computed `count`/`sum`/`avg`/`min`/`max` over relations — see [Aggregates](#aggregates--having) |
+| `having` | JSON string / object | Filter on aggregate aliases (same operators as `where`) |
 | `take` *(or `limit`)* | number | Page size — capped by `maxPerPage` |
 | `skip` *(or `offset`)* | number | Offset |
 | `withDeleted` | boolean | Include soft-deleted rows |
@@ -282,6 +295,7 @@ GET /users?where={"age":{"$gte":18},"role":{"$in":["admin","editor"]}}
 | --- | --- |
 | `$eq` | Equal (default if you write a scalar) |
 | `$ne` | Not equal |
+| `$ieq` | Case-insensitive equal |
 | `$gt` / `$gte` | Greater than / or equal |
 | `$lt` / `$lte` | Less than / or equal |
 | `$in` / `$notIn` | In / not in array |
@@ -290,12 +304,17 @@ GET /users?where={"age":{"$gte":18},"role":{"$in":["admin","editor"]}}
 | `$startsWith` / `$endsWith` | Prefix / suffix match |
 | `$iStartsWith` / `$iEndsWith` | Case-insensitive prefix / suffix match |
 | `$inL` / `$notinL` | Case-insensitive `IN` / `NOT IN` |
+| `$regex` | Regular-expression match |
 | `$contArr` | Postgres array contains (`@>`) |
 | `$intersectsArr` | Postgres array intersects (`&&`) |
 | `$isNull` / `$isNotNull` | `IS NULL` / `IS NOT NULL` (no value) |
 | `$between` / `$notBetween` | Range `[start, end]` |
 | `$isTrue` / `$isFalse` | Boolean truthiness |
+| `$exists` / `$notExists` | Relation has / has no matching rows |
 | `$and` / `$or` | Logical combinators |
+
+That's **29 filter operators**. Need your own? Register one — see
+[Custom operators](https://ack-solutions.github.io/nest-crud/querying#custom-operators).
 
 Combinators nest arbitrarily:
 
@@ -353,6 +372,55 @@ type RelationObjectValue = {
   joinType?: 'left' | 'inner'; // default 'left'
 };
 ```
+
+---
+
+## Aggregates & HAVING
+
+Attach computed values to each row — `count`/`sum`/`avg`/`min`/`max` over a
+relation — then filter (`having`) and sort by them. The aggregate `field` is a
+relation path (`posts.id`), and `as` names the alias returned on each row.
+
+```http
+# users with their post count, only those with > 1 post, most prolific first
+GET /users
+  ?aggregates=[{"fn":"count","field":"posts.id","as":"postCount"}]
+  &having={"postCount":{"$gt":1}}
+  &order={"postCount":"DESC"}
+```
+
+Each returned user gets `postCount` alongside its columns. A per-aggregate `where`
+narrows the rows it counts (e.g. only published posts):
+
+```json
+[{ "fn": "count", "field": "posts.id", "as": "published", "where": { "status": "published" } }]
+```
+
+`having` uses the **same operators** as `where`, against the aggregate aliases.
+Aggregates run as a lightweight two-phase query (compute keys → hydrate), so
+relation fan-out never inflates the numbers. Full guide:
+[Querying → Aggregates](https://ack-solutions.github.io/nest-crud/querying#aggregates).
+
+---
+
+## Hiding sensitive fields
+
+Mark columns or relations you never want exposed — password hashes, tokens, audit
+logs — with the `@CrudHidden()` decorator on the entity, or `hiddenFields` on
+`@Crud()`. A hidden field is dropped from every response and **rejected** (with the
+same error as an unknown field) in `where` / `order` / `aggregates` / `relations`.
+
+```ts
+@Column() @CrudHidden() passwordHash: string;     // never selectable or filterable
+```
+
+```ts
+@Crud({ entity: User, path: 'users', hiddenFields: ['passwordHash'] })
+```
+
+This guards the generated query surface; pair it with route guards for access
+control. Full behaviour table:
+[Querying → Hiding sensitive fields](https://ack-solutions.github.io/nest-crud/querying#hiding-sensitive-fields).
 
 ---
 

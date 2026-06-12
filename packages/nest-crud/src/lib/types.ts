@@ -6,6 +6,7 @@ export enum WhereLogicalOperatorEnum {
 export enum WhereOperatorEnum {
     EQ = '$eq',
     NOT_EQ = '$ne',
+    IEQ = '$ieq', // case-insensitive equality
     GT = '$gt',
     GT_OR_EQ = '$gte',
     LT = '$lt',
@@ -30,6 +31,8 @@ export enum WhereOperatorEnum {
     NOT_BETWEEN = '$notBetween',
     IS_TRUE = '$isTrue',
     IS_FALSE = '$isFalse',
+    EXISTS = '$exists', // relation-existence: { posts: { $exists: true } }
+    NOT_EXISTS = '$notExists', // relation-existence: { posts: { $notExists: true } }
 }
 
 export enum OrderDirectionEnum {
@@ -54,3 +57,32 @@ export type RelationObjectValue = {
 export type RelationObject = Record<string, RelationObjectValue | boolean>;
 
 export type RelationOptions = string | string[] | RelationObject;
+
+export enum AggregateFnEnum {
+    COUNT = 'count',
+    SUM = 'sum',
+    AVG = 'avg',
+    MIN = 'min',
+    MAX = 'max',
+}
+
+/**
+ * A computed aggregate attached to each returned row, e.g.
+ * `{ fn: 'count', field: 'posts.id', as: 'postCount' }` →
+ * `(SELECT COUNT(posts.id) FROM posts WHERE posts.userId = user.id) AS postCount`.
+ * `field` is a relation-qualified path; `as` must be a safe identifier
+ * (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and is what `having`/`order` reference.
+ */
+export interface AggregateSpec {
+    fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
+    field: string;
+    as: string;
+    distinct?: boolean;
+    /**
+     * Optional filter on the related rows, using the **same operator syntax as
+     * `where`** (`$eq`, `$gt`, `$in`, `$like`, `$between`, `$and`/`$or`, …). Keys
+     * are columns of the related entity. E.g. count only published posts:
+     * `{ fn: 'count', field: 'posts.id', as: 'publishedCount', where: { status: 'published' } }`.
+     */
+    where?: WhereOptions;
+}

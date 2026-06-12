@@ -39,3 +39,7 @@ lerna-debug.log*
 *.sqlite3
 *.db
 database.sqlite
+
+# Env (local DB credentials for e2e) — .env.example stays tracked
+.env
+.env.local

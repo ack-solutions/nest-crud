@@ -15,12 +15,13 @@ Works in **React, Angular, Vue, Node.js**, and any TypeScript environment. Zero 
 5. [Operators](#operators)
 6. [Order and pagination](#order-and-pagination)
 7. [Relations](#relations)
-8. [Soft-delete flags](#soft-delete-flags)
-9. [Output: `toObject()` vs `toObject(true)`](#output-toobject-vs-toobjecttrue)
-10. [Custom keys (`set`)](#custom-keys-set)
-11. [Recipes](#recipes)
-12. [Types & enums reference](#types--enums-reference)
-13. [Limits](#limits)
+8. [Aggregates & HAVING](#aggregates--having)
+9. [Soft-delete flags](#soft-delete-flags)
+10. [Output: `toObject()` vs `toObject(true)`](#output-toobject-vs-toobjecttrue)
+11. [Custom keys (`set`)](#custom-keys-set)
+12. [Recipes](#recipes)
+13. [Types & enums reference](#types--enums-reference)
+14. [Limits](#limits)
 
 ---
 
@@ -96,7 +97,7 @@ Four call shapes, all accepted by `where` / `andWhere` / `orWhere`:
 qb.where('status', 'active');
 
 // 2. field + operator + value
-qb.where('age', WhereOperatorEnum.GTE, 18);
+qb.where('age', WhereOperatorEnum.GT_OR_EQ, 18);
 
 // 3. raw object
 qb.where({ role: { $in: ['admin', 'editor'] } });
@@ -114,13 +115,16 @@ qb.orWhere((b) => {
 ### Relations
 
 ```ts
-qb.addRelation('posts');
-qb.addRelation('posts', ['id', 'title']);
-qb.addRelation('posts', ['id', 'title'], { published: { $eq: true } });
+qb.addRelation('posts');                                          // join, all columns
+qb.addRelation('posts', ['id', 'title']);                         // pick columns
+qb.addRelation('posts', ['id', 'title'], { published: { $eq: true } }); // + scoped where
+qb.addRelation('posts', ['id'], undefined, 'inner');              // inner join
+qb.addRelation('posts', { select: ['id'], joinType: 'inner' });   // object config
 qb.removeRelation('posts');
 ```
 
-Need `joinType: 'inner'` or deeper relation config? Use [`set()`](#custom-keys-set) — the fluent API only covers the common shape.
+`joinType` defaults to `left`. Use `'inner'` to drop root rows that have no related
+row. The object-config form accepts `{ select?, where?, joinType? }`.
 
 ### Order
 
@@ -129,6 +133,25 @@ qb.addOrder('createdAt', OrderDirectionEnum.DESC);
 qb.addOrder('email', OrderDirectionEnum.ASC);
 qb.removeOrder('email');
 ```
+
+`addOrder` also accepts an [aggregate](#aggregates--having) alias.
+
+### Aggregates & HAVING
+
+Attach a per-row `count` / `sum` / `avg` / `min` / `max` over a relation, then
+optionally filter (`having`) and sort by the alias:
+
+```ts
+import { AggregateFnEnum, WhereOperatorEnum, OrderDirectionEnum } from '@ackplus/nest-crud-request';
+
+qb.addAggregate({ fn: AggregateFnEnum.COUNT, field: 'posts.id', as: 'postCount' });
+qb.having('postCount', WhereOperatorEnum.GT, 5);   // same call shapes as where()
+qb.addOrder('postCount', OrderDirectionEnum.DESC);
+qb.removeAggregate('postCount');                   // drop one by alias
+```
+
+- `having` / `andHaving` / `orHaving` mirror `where` / `andWhere` / `orWhere`.
+- See the full [Aggregates & HAVING](#aggregates--having) section for the response shape.
 
 ### Pagination
 
@@ -215,6 +238,7 @@ Import them from the enum or pass the raw `$...` string — both work.
 | --- | --- | --- |
 | `EQ` | `$eq` | Equal (default when you pass a scalar without an operator) |
 | `NOT_EQ` | `$ne` | Not equal |
+| `IEQ` | `$ieq` | Case-insensitive equal |
 | `GT` / `GT_OR_EQ` | `$gt` / `$gte` | Greater than / or equal |
 | `LT` / `LT_OR_EQ` | `$lt` / `$lte` | Less than / or equal |
 | `IN` / `NOT_IN` | `$in` / `$notIn` | In / not in array |
@@ -228,8 +252,20 @@ Import them from the enum or pass the raw `$...` string — both work.
 | `IS_NULL` / `IS_NOT_NULL` | `$isNull` / `$isNotNull` | `IS NULL` / `IS NOT NULL` (no value) |
 | `BETWEEN` / `NOT_BETWEEN` | `$between` / `$notBetween` | Range `[start, end]` |
 | `IS_TRUE` / `IS_FALSE` | `$isTrue` / `$isFalse` | Boolean truthiness |
+| `EXISTS` / `NOT_EXISTS` | `$exists` / `$notExists` | Relation has / has no rows (key is a **relation**) |
 
 Logical operators (`WhereLogicalOperatorEnum`): `AND` (`$and`), `OR` (`$or`).
+
+```ts
+// value-less operators — pass the operator alone (2-arg form)
+qb.where('deletedAt', WhereOperatorEnum.IS_NULL);   // { deletedAt: { $isNull: true } }
+// relation existence — the key is a relation name
+qb.where('posts', WhereOperatorEnum.EXISTS, true);  // { posts: { $exists: true } }
+```
+
+> `$exists` / `$notExists` test only *whether* a relation has rows (a subquery on
+> the server) — they don't join it. To also return the related rows, add the
+> relation with [`addRelation`](#relations-1).
 
 ---
 
@@ -264,13 +300,75 @@ new QueryBuilder()
 // }
 ```
 
-Need `joinType`? The builder doesn't have a dedicated helper, so use `set`:
+`joinType` (default `left`) is supported directly — positionally or via the
+object-config form:
 
 ```ts
-qb.set('relations', {
-  posts: { select: ['id', 'title'], joinType: 'inner' },
-});
+new QueryBuilder()
+  .addRelation('posts', ['id'], undefined, 'inner')
+  .addRelation('profile', { joinType: 'inner' })
+  .toObject(true);
+
+// { relations: { posts: { select: ['id'], joinType: 'inner' }, profile: { joinType: 'inner' } } }
 ```
+
+`RelationBuilder` is also exported if you want to compose relations separately:
+
+```ts
+import { RelationBuilder } from '@ackplus/nest-crud-request';
+
+const relations = new RelationBuilder()
+  .add('posts', { select: ['id', 'title'], where: { status: 'published' } })
+  .toObject();
+```
+
+---
+
+## Aggregates & HAVING
+
+Attach computed values over a relation to each returned row, filter them with
+`having`, and sort by their alias.
+
+```ts
+import {
+  QueryBuilder, AggregateFnEnum, WhereOperatorEnum, OrderDirectionEnum,
+} from '@ackplus/nest-crud-request';
+
+const params = new QueryBuilder()
+  .addAggregate({ fn: AggregateFnEnum.COUNT, field: 'posts.id', as: 'postCount' })
+  .addAggregate({ fn: AggregateFnEnum.SUM, field: 'posts.likes', as: 'totalLikes' })
+  .having('postCount', WhereOperatorEnum.GT, 5)
+  .addOrder('postCount', OrderDirectionEnum.DESC)
+  .toObject();
+
+// the server returns each row with the aggregate attached:
+// { items: [ { id, name, postCount, totalLikes } ], total }
+```
+
+| `fn` (`AggregateFnEnum`) | Result | Empty relation |
+| --- | --- | --- |
+| `COUNT` (`'count'`) | number of related rows | `0` |
+| `SUM` (`'sum'`) | sum of `field` | `0` |
+| `AVG` (`'avg'`) | average of `field` | `null` |
+| `MIN` / `MAX` (`'min'` / `'max'`) | min / max of `field` | `null` |
+
+```ts
+interface AggregateSpec {
+  fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
+  field: string;       // relation-qualified, e.g. 'posts.id'
+  as: string;          // alias; used by having() and addOrder()
+  distinct?: boolean;  // COUNT(DISTINCT …)
+  where?: WhereOptions; // filter the related rows — same operators as where
+}
+```
+
+- `where` on an aggregate filters only the related rows it counts/sums (e.g. count
+  only published posts): `addAggregate({ fn: 'count', field: 'posts.id', as: 'published', where: { status: 'published' } })`.
+- `having(...)` / `andHaving(...)` / `orHaving(...)` take the same call shapes as
+  `where(...)`, but the key is an aggregate **alias** (e.g. `postCount`).
+- `removeAggregate(alias)` drops one.
+- In `toObject()` aggregates/having are JSON-stringified; in `toObject(true)` they
+  stay as native array/object.
 
 ---
 
@@ -381,11 +479,9 @@ Everything below is exported from the package root.
 
 ### Public exports
 
-- **Classes:** `QueryBuilder`, `WhereBuilder`
-- **Enums:** `WhereOperatorEnum`, `WhereLogicalOperatorEnum`, `OrderDirectionEnum`
-- **Types:** `QueryBuilderOptions`, `WhereObject`, `WhereOptions`, `RelationObject`, `RelationObjectValue`, `RelationOptions`, `FindManyResponse<T>`, `FindAllResponse<T>`, `WhereBuilderCondition`
-
-`RelationBuilder` exists in the source but is **not** exported — use `QueryBuilder.addRelation()` or `set('relations', ...)` instead.
+- **Classes:** `QueryBuilder`, `WhereBuilder`, `RelationBuilder`
+- **Enums:** `WhereOperatorEnum`, `WhereLogicalOperatorEnum`, `OrderDirectionEnum`, `AggregateFnEnum`
+- **Types:** `QueryBuilderOptions`, `AggregateSpec`, `WhereObject`, `WhereOptions`, `RelationObject`, `RelationObjectValue`, `RelationOptions`, `FindManyResponse<T>`, `FindAllResponse<T>`, `WhereBuilderCondition`
 
 ### Shapes
 
@@ -395,11 +491,23 @@ interface QueryBuilderOptions {
   relations?: RelationOptions | string;
   where?: WhereOptions | string;
   order?: Record<string, OrderDirectionEnum> | string;
+  aggregates?: AggregateSpec[] | string;
+  having?: WhereOptions | string;
   skip?: number;
   take?: number;
   withDeleted?: boolean;
   onlyDeleted?: boolean;
   [extra: string]: any;
+}
+
+enum AggregateFnEnum { COUNT = 'count', SUM = 'sum', AVG = 'avg', MIN = 'min', MAX = 'max' }
+
+interface AggregateSpec {
+  fn: AggregateFnEnum | 'count' | 'sum' | 'avg' | 'min' | 'max';
+  field: string;        // relation-qualified path, e.g. 'posts.id'
+  as: string;           // alias used by having() / addOrder()
+  distinct?: boolean;
+  where?: WhereOptions; // filter the related rows (same operators as where)
 }
 
 type RelationObjectValue = {
@@ -430,11 +538,23 @@ type WhereBuilderCondition =
 ## Limits
 
 - No `setPage` / `setPerPage` helpers (compute `skip` manually).
-- No `setJoinType` helper — use `set('relations', ...)` for non-default join types.
 - No built-in query-string serializer — pipe `toObject()` through `URLSearchParams`, `qs`, or your HTTP client's `params` option.
 - Doesn't validate server-side operators — you can build filters the server rejects if you mix operators and column types carelessly.
 
 For the matching backend, see [`@ackplus/nest-crud`](../nest-crud/README.md).
+
+---
+
+## Related packages
+
+| Package | Registry | For |
+| --- | --- | --- |
+| [`@ackplus/nest-crud`](../nest-crud/README.md) | [npm](https://www.npmjs.com/package/@ackplus/nest-crud) | The NestJS + TypeORM server |
+| [`nest_crud_request`](../../clients/flutter/nest_crud_request/README.md) | [pub.dev](https://pub.dev/packages/nest_crud_request) | The Dart/Flutter twin of this builder |
+
+This package and its Dart twin produce an **identical wire format** and publish
+together at one version. Full docs: <https://ack-solutions.github.io/nest-crud/> ·
+[all packages](../../docs/packages.md).
 
 ---
 

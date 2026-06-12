@@ -113,10 +113,6 @@ export class WhereBuilder {
         return this;
     }
 
-    // private updateCondition(condition: Record<string, any>, type: '$and' | '$or'): void {
-    //     this.whereObject[type] = [...(this.whereObject[type] || []), condition].filter(Boolean);
-    // }
-
     private updateCondition(condition: Record<string, any>, type: WhereLogicalOperatorEnum | null): void {
         if (type === null) {
             // For direct where conditions, we need to merge intelligently

@@ -25,7 +25,9 @@ well-documented, and safe to upgrade — **without breaking existing users**.
   hardening, soft-delete/guards/interceptors/hooks/Swagger-contract coverage. **156 tests, ~86% lines, CI-gated.**
 - [x] **Phase 3 — Swagger polish** ✅ (writable create/update DTOs, uuid path params, correct array responses)
 - [x] **Phase 4 — Developer documentation** ✅ — core guides + CHANGELOG (hosted docs site & framework guides deferred)
-- [ ] **Phase 5 — v2.0 breaking polish** (+ migration guide)
+- [~] **Phase 5 — v2.0 breaking polish** (on the `v2` branch) — started: unified `{success,message}`
+  responses, removed deprecated export, MIGRATION.md. Planned: hook-signature normalization,
+  `this.options` exposure, custom-route registration, i18n messages.
 
 ---
 

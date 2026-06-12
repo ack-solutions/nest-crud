@@ -8,12 +8,26 @@ import { UserService } from './user.service';
 @Crud({
   entity: User,
   path: 'users',
+  // Soft-delete: DELETE marks `deletedAt` instead of removing the row, so the
+  // restore / trash routes and the `withDeleted` / `onlyDeleted` flags are demoable.
+  softDelete: true,
+  // `password` and `auditLogs` are hidden on the entity via @CrudHidden(); you can
+  // also hide per-controller here, e.g. hiddenFields: ['password'].
   routes: {
     findMany: { enabled: true },
+    findAll: { enabled: true },
+    counts: { enabled: true },
     findOne: { enabled: true },
     create: { enabled: true },
+    createMany: { enabled: true },
     update: { enabled: true },
+    updateMany: { enabled: true },
     delete: { enabled: true },
+    deleteMany: { enabled: true },
+    restore: { enabled: true },
+    restoreMany: { enabled: true },
+    deleteFromTrash: { enabled: true },
+    deleteFromTrashMany: { enabled: true },
   },
 })
 export class UserController {

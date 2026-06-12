@@ -67,6 +67,15 @@ export class RequestQueryParser {
             options.select = this.parseJSON(parsedQuery.select);
             delete parsedQuery.select;
         }
+        // Advanced querying (v2.1): per-row aggregates + HAVING filter on their aliases.
+        if (parsedQuery.aggregates !== undefined) {
+            options.aggregates = this.parseJSON(parsedQuery.aggregates);
+            delete parsedQuery.aggregates;
+        }
+        if (parsedQuery.having !== undefined) {
+            options.having = this.parseJSON(parsedQuery.having);
+            delete parsedQuery.having;
+        }
 
         return { ...parsedQuery, ...options };
     }

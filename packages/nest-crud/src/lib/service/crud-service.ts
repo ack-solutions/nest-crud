@@ -4,11 +4,13 @@ import { FindOptionsWhere, In, Repository, SaveOptions, SelectQueryBuilder } fro
 import type { DeepPartial } from 'typeorm';
 
 import { BaseEntity } from '../base-entity';
+import { AggregateQueryBuilder } from '../helper/aggregate-query-builder';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
+import { CrudMessages, CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
+import { CrudConfigService } from './crud-config.service';
 
 
 export class CrudService<T extends BaseEntity> {
@@ -16,6 +18,14 @@ export class CrudService<T extends BaseEntity> {
     options: CrudOptions;
 
     constructor(readonly repository: Repository<T>) { }
+
+    /**
+     * Resolve a response message, allowing a global override via
+     * `CrudConfigService.load({ messages })`. Falls back to the English default.
+     */
+    protected msg(key: keyof CrudMessages, fallback: string): string {
+        return CrudConfigService.config.messages?.[key] ?? fallback;
+    }
 
     /**
      * Hook that runs before `create()` and `update()` persist data.
@@ -347,15 +357,16 @@ export class CrudService<T extends BaseEntity> {
             const savedEntities = await manager.save<T>(entities as T[], saveOptions);
 
             // Reload so generated columns / DB defaults / relations are present,
-            // matching the single create() behaviour.
+            // matching the single create() behaviour. One IN(...) query (not N
+            // concurrent ones) — concurrent queries on a transaction's single
+            // connection are deprecated in pg and removed in pg@9.
             const primaryKey = this.repository.metadata.primaryColumns[0].propertyName;
-            const reloaded = await Promise.all(
-                savedEntities.map((saved: any) =>
-                    manager.findOneByOrFail(this.repository.target as any, {
-                        [primaryKey]: saved[primaryKey],
-                    }),
-                ),
-            ) as T[];
+            const ids = savedEntities.map((saved: any) => saved[primaryKey]);
+            const found = await manager.find(this.repository.target as any, {
+                where: { [primaryKey]: In(ids) },
+            }) as T[];
+            const byId = new Map(found.map((e: any) => [String(e[primaryKey]), e]));
+            const reloaded = savedEntities.map((saved: any) => byId.get(String(saved[primaryKey])) ?? saved) as T[];
 
             for (let i = 0; i < reloaded.length; i++) {
                 await this.afterSave(reloaded[i], null, data.bulk[i]);
@@ -387,7 +398,13 @@ export class CrudService<T extends BaseEntity> {
         const parsedOptions = RequestQueryParser.parse(query || {});
         applyListPagination(parsedOptions, crudOptions);
 
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        // Aggregate path: user-defined count/sum/avg/min/max over relations, with
+        // optional HAVING/order on the aggregate aliases (two-phase derived table).
+        if (AggregateQueryBuilder.has(parsedOptions)) {
+            return this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+        }
+
+        let queryBuilder = this.createFindQueryBuilder();
 
         let builder = queryBuilder.build(parsedOptions);
         builder = await this.beforeFindMany(builder, query);
@@ -413,11 +430,34 @@ export class CrudService<T extends BaseEntity> {
         const parsedOptions = RequestQueryParser.parse(query || {});
         applyNoPaginationLimit(parsedOptions, crudOptions);
 
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        if (AggregateQueryBuilder.has(parsedOptions)) {
+            const { items } = await this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+            return items;
+        }
+
+        let queryBuilder = this.createFindQueryBuilder();
 
         let builder = queryBuilder.build(parsedOptions);
         builder = await this.beforeFindMany(builder, query);
         return builder.getMany();
+    }
+
+    /**
+     * Factory for the list query builder. Override in a subclass to customise how
+     * filtering / relations / select are turned into SQL (the standard extension
+     * point alongside the `beforeFindMany` hook).
+     */
+    protected createFindQueryBuilder(): FindQueryBuilder<T> {
+        return new FindQueryBuilder(this.repository);
+    }
+
+    /**
+     * Factory for the aggregate (two-phase) query builder. Override to customise the
+     * aggregate execution. Note: `beforeFindMany` is not applied on the aggregate
+     * path — override this instead.
+     */
+    protected createAggregateQueryBuilder(): AggregateQueryBuilder<T> {
+        return new AggregateQueryBuilder(this.repository);
     }
 
     /**
@@ -439,7 +479,7 @@ export class CrudService<T extends BaseEntity> {
         sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter
-        let queryBuilder = new FindQueryBuilder(this.repository);
+        let queryBuilder = this.createFindQueryBuilder();
         let query = queryBuilder.build(parsedOptions);
         query = await this.beforeCounts(query);
 
@@ -638,7 +678,8 @@ export class CrudService<T extends BaseEntity> {
 
         await this.afterDelete(oldData);
         return {
-            message: 'Successfully deleted',
+            success: true,
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -654,7 +695,8 @@ export class CrudService<T extends BaseEntity> {
     async deleteMany(params: IDeleteManyOptions, softDelete?: boolean, ..._others: any) {
         if (!params.ids || params.ids.length === 0) {
             return {
-                message: 'No items to delete',
+                success: true,
+                message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
         const ids = await this.beforeDeleteMany(params.ids);
@@ -666,11 +708,13 @@ export class CrudService<T extends BaseEntity> {
             }
             await this.afterDeleteMany(ids);
             return {
-                message: 'Successfully deleted',
+                success: true,
+                message: this.msg('deleted', 'Successfully deleted'),
             };
         }
         return {
-            message: 'No items to delete',
+            success: true,
+            message: this.msg('noItemsToDelete', 'No items to delete'),
         };
     }
 
@@ -701,7 +745,7 @@ export class CrudService<T extends BaseEntity> {
         await this.afterDeleteFromTrash(oldData);
         return {
             success: true,
-            message: 'Successfully deleted',
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -715,7 +759,7 @@ export class CrudService<T extends BaseEntity> {
         if (!params.ids || params.ids.length === 0) {
             return {
                 success: true,
-                message: 'No items to delete',
+                message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
         const ids = await this.beforeDeleteFromTrashMany(params.ids);
@@ -725,7 +769,7 @@ export class CrudService<T extends BaseEntity> {
         }
         return {
             success: true,
-            message: 'Successfully deleted',
+            message: this.msg('deleted', 'Successfully deleted'),
         };
     }
 
@@ -756,7 +800,7 @@ export class CrudService<T extends BaseEntity> {
         await this.afterRestore(oldData);
         return {
             success: true,
-            message: 'Successfully restored',
+            message: this.msg('restored', 'Successfully restored'),
         };
     }
 
@@ -776,7 +820,7 @@ export class CrudService<T extends BaseEntity> {
         }
         return {
             success: true,
-            message: 'Successfully restored',
+            message: this.msg('restored', 'Successfully restored'),
         };
     }
 
@@ -797,6 +841,10 @@ export class CrudService<T extends BaseEntity> {
                 await manager.update(this.repository.target, order[i] as any, { order: i } as any);
             }
         });
+        return {
+            success: true,
+            message: this.msg('reordered', 'Successfully reordered'),
+        };
     }
 
     /**

@@ -83,3 +83,52 @@ jobs:
             --tag "${{ steps.version.outputs.dist_tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Publishes the Dart/Flutter query builder to pub.dev on the SAME tag, at the
+  # same version. One-time setup on pub.dev: claim the `nest_crud_request` package
+  # and enable "Automated publishing" from this GitHub repo with tag pattern
+  # `{{version}}` (matching the repo's bare `1.2.3` tags). The first publish must be
+  # done manually (`dart pub publish` locally); automated publishing takes over after.
+  publish-dart:
+    name: Publish Dart package (pub.dev)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for pub.dev OIDC automated publishing
+    defaults:
+      run:
+        working-directory: clients/flutter/nest_crud_request
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Set pubspec version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION="${VERSION#v}"
+          sed -i.bak "s/^version: .*/version: ${VERSION}/" pubspec.yaml && rm -f pubspec.yaml.bak
+
+      - name: Install + test (gate release)
+        run: |
+          dart pub get
+          dart test
+
+      # Idempotent: the first pub.dev publish is done manually (pub.dev requires the
+      # package to exist before automated publishing can be enabled), so on that first
+      # tag the version already exists — skip instead of failing. Later tags publish
+      # normally because their version isn't on pub.dev yet.
+      - name: Publish to pub.dev (skip if this version already exists)
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"; VERSION="${VERSION#v}"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://pub.dev/api/packages/nest_crud_request/versions/${VERSION}")
+          if [ "$CODE" = "200" ]; then
+            echo "nest_crud_request ${VERSION} is already on pub.dev — skipping publish."
+          else
+            dart pub publish --force
+          fi

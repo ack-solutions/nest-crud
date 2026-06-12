@@ -1,1 +1,2 @@
 export * from './crud.decorator';
+export * from './crud-hidden.decorator';

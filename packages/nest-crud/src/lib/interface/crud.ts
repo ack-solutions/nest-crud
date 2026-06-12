@@ -1,4 +1,5 @@
 import {
+    AggregateSpec,
     OrderDirectionEnum,
     RelationOptions,
     WhereOptions
@@ -27,6 +28,17 @@ export interface CrudQueryOptions {
     relations?: string[];
 }
 
+/**
+ * Customisable response messages (i18n). Any omitted key falls back to the
+ * English default. Set globally via `CrudConfigService.load({ messages })`.
+ */
+export interface CrudMessages {
+    deleted?: string;
+    noItemsToDelete?: string;
+    restored?: string;
+    reordered?: string;
+}
+
 export interface CrudOptions {
     debug?: boolean;
     name?: string;
@@ -43,6 +55,8 @@ export interface CrudOptions {
     entity: any;
     routes?: Partial<CrudRoutesOptions>;
     softDelete?: boolean;
+    /** Override delete/restore/reorder response messages (i18n). */
+    messages?: CrudMessages;
     validation?: ValidationPipeOptions;
     dto?: {
         create?: any;
@@ -91,6 +105,10 @@ export interface IFindManyOptions {
     order?: Record<string, OrderDirectionEnum>;
     where?: WhereOptions;
     select?: string[];
+    /** Computed aggregates attached to each row (count/sum/avg/min/max over a relation). */
+    aggregates?: AggregateSpec[];
+    /** Filter on aggregate aliases (same operator syntax as `where`), e.g. `{ postCount: { $gt: 5 } }`. */
+    having?: WhereOptions;
     onlyDeleted?: boolean;
     withDeleted?: boolean;
     [extraQueryParams: string]: any;

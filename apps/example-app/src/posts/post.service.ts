@@ -16,7 +16,7 @@ export class PostService extends CrudService<Post> {
   // Custom methods
   async findPublishedPosts(): Promise<Post[]> {
     return this.repository.find({
-      where: { published: true },
+      where: { status: 'published' },
       relations: ['author'],
     });
   }

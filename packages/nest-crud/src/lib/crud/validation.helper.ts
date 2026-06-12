@@ -2,12 +2,14 @@ import { ValidationPipe, ValidationPipeOptions } from '@nestjs/common';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
-import { isNil } from 'lodash';
+import { isNil, uniq } from 'lodash';
+import { getMetadataArgsStorage } from 'typeorm';
 
 import { CrudOptions, CrudValidationGroupsEnum } from '../interface/crud';
 import { resolveMaxPerPage } from '../helper/pagination-limit';
 import { isFalse } from '../utils';
 import { WhereOptions } from '../types';
+import { getHiddenFields } from '../decorator/crud-hidden.decorator';
 
 /**
  * Helper function to generate documentation links
@@ -19,6 +21,33 @@ const docsLink = (anchor?: string): string => {
     const url = anchor ? `${baseUrl}#${anchor}` : baseUrl;
     return `[Documentation](${url})`;
 };
+
+/**
+ * Real, non-system, non-hidden column / relation names for an entity, used to build
+ * Swagger examples that match the actual entity instead of generic placeholders.
+ * Reads TypeORM's metadata-args storage (populated at decorator time, before the
+ * DataSource initialises). Falls back to empty arrays on any error.
+ */
+function entityFields(entity: any): { columns: string[]; relations: string[]; toMany: string[] } {
+    try {
+        const storage = getMetadataArgsStorage();
+        const inChain = (target: any) =>
+            typeof target === 'function' && (target === entity || entity.prototype instanceof target);
+        const system = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt', 'version']);
+        const hidden = getHiddenFields(entity);
+        const keep = (name: string) => !system.has(name) && !hidden.has(name);
+
+        const columns = uniq(storage.columns.filter((c) => inChain(c.target)).map((c) => c.propertyName)).filter(keep);
+        const rels = storage.relations.filter((r) => inChain(r.target) && !hidden.has(r.propertyName));
+        const relations = uniq(rels.map((r) => r.propertyName));
+        const toMany = uniq(
+            rels.filter((r) => r.relationType === 'one-to-many' || r.relationType === 'many-to-many').map((r) => r.propertyName),
+        );
+        return { columns, relations, toMany };
+    } catch {
+        return { columns: [], relations: [], toMany: [] };
+    }
+}
 
 
 class FindManyDto {
@@ -52,69 +81,6 @@ class CountsDto {
 }
 
 class ManyConditionDto {
-    @ApiPropertyOptional({
-        description: `Conditions to filter the query. Supports complex filtering with operators like $gt, $lt, $in, $like, $between, $or, $and, etc. Can be provided as a JSON string or object. ${docsLink('query-operators')}`,
-        examples: {
-            simpleFilter: {
-                summary: 'Simple filter',
-                description: 'Filter by single field with comparison operators',
-                value: {
-                    age: { $gt: 18, $lt: 65 },
-                    status: 'active'
-                }
-            },
-            complexFilter: {
-                summary: 'Complex filter with $or',
-                description: 'Filter using logical OR operator',
-                value: {
-                    $or: [
-                        {
-                            firstName: { $like: '%John%' },
-                            lastName: { $like: '%Doe%' },
-                        },
-                        {
-                            lastName: { $like: '%Doe%' },
-                            firstName: { $like: '%John%' },
-                        },
-                    ],
-                    age: {
-                        $gt: 18,
-                        $lt: 65,
-                    },
-                    status: { $in: ['active', 'inactive'] },
-                    joinedDate: { $between: ['2020-01-01', '2021-01-01'] },
-                }
-            },
-            jsonString: {
-                summary: 'JSON string format',
-                description: 'Filter as JSON string',
-                value: '{"age":{"$gt":18,"$lt":65},"status":"active"}'
-            },
-            nestedRelations: {
-                summary: 'Nested relation filter',
-                description: 'Filter using dot notation for nested relations',
-                value: {
-                    'profile.age': { $gt: 18 },
-                    'profile.status': { $in: ['active', 'pending'] }
-                }
-            }
-        },
-        oneOf: [
-            {
-                type: 'string',
-                description: 'JSON string representation of the filter conditions',
-                example: '{"age":{"$gt":18},"status":"active"}'
-            },
-            {
-                type: 'object',
-                description: 'Object representation of filter conditions',
-                additionalProperties: true
-            }
-        ]
-    })
-    @IsOptional()
-    where?: WhereOptions | string; // Support both object and JSON string
-
     @ApiPropertyOptional({
         description: `Return only soft-deleted records. When true, only records that have been soft-deleted will be returned. Requires softDelete to be enabled on the entity. ${docsLink('soft-delete')}`,
         example: true,
@@ -157,108 +123,68 @@ export class Validation {
             // and the legacy `maxPageSize`, so the Swagger @Max reflects the real cap.
             const maxPerPage = resolveMaxPerPage(options);
 
+            // Build Swagger examples from the entity's real columns / relations so the
+            // "Try it out" values match the entity. All examples are JSON STRINGS, so
+            // Swagger UI renders a plain text box (no "must be valid JSON" rejection).
+            const fields = entityFields(options.entity);
+            const cols = fields.columns.length ? fields.columns : ['id', 'name', 'email'];
+            const rels = fields.relations.length ? fields.relations : ['profile', 'posts'];
+            const aggRel = fields.toMany[0] ?? fields.relations[0] ?? 'posts';
+            const orderCol = cols[0];
+            const aggAlias = `${aggRel}Count`;
+            const ex = {
+                whereEquals: JSON.stringify({ [cols[0]]: 'value' }),
+                whereIn: JSON.stringify({ [cols[0]]: { $in: ['a', 'b'] } }),
+                whereSearch: JSON.stringify({ [cols[0]]: { $iLike: '%a%' } }),
+                whereExists: JSON.stringify({ [aggRel]: { $exists: true } }),
+                relationsArray: JSON.stringify(rels.slice(0, 2)),
+                relationsObject: JSON.stringify([{ [aggRel]: { select: [cols[0]], joinType: 'inner' } }]),
+                relationsNested: '["posts.comments","profile.addresses"]',
+                orderSingle: JSON.stringify({ [orderCol]: 'DESC' }),
+                orderMultiple: JSON.stringify({ [orderCol]: 'DESC', createdAt: 'ASC' }),
+                select: JSON.stringify(cols.slice(0, 3)),
+                aggOne: JSON.stringify([{ fn: 'count', field: `${aggRel}.id`, as: aggAlias }]),
+                aggMany: JSON.stringify([
+                    { fn: 'count', field: `${aggRel}.id`, as: aggAlias },
+                    { fn: 'sum', field: `${aggRel}.likes`, as: `${aggRel}Likes` },
+                ]),
+                having: JSON.stringify({ [aggAlias]: { $gt: 1 } }),
+            };
+
             class FindManyImpl extends ManyConditionDto {
 
                 @ApiPropertyOptional({
-                    description: `Relations to include in the query. Can be provided as an array of relation names, an object with relation configurations, or a JSON string. Supports nested relations using dot notation. ${docsLink('relations')}`,
+                    type: String,
+                    description: `Filter as a **JSON string**. Shorthand \`{"field":value}\` = equals; full form \`{"field":{"$op":value}}\`. Operators: $eq $ne $ieq $gt $gte $lt $lte $in $notIn $like $iLike $startsWith $endsWith $between $isNull $isNotNull $isTrue $isFalse $exists $notExists, grouped with $and / $or. ${docsLink('query-operators')}`,
                     examples: {
-                        simpleArray: {
-                            summary: 'Simple array of relation names',
-                            description: 'Include multiple relations as an array',
-                            value: ['profile', 'address', 'orders']
-                        },
-                        objectFormat: {
-                            summary: 'Object format with configuration',
-                            description: 'Include relations with additional configuration',
-                            value: {
-                                profile: true,
-                                address: { select: ['id', 'street', 'city'] },
-                                orders: { where: { status: 'active' } }
-                            }
-                        },
-                        jsonString: {
-                            summary: 'JSON string format',
-                            description: 'Relations as JSON string',
-                            value: '["profile","address","orders"]'
-                        },
-                        nestedRelations: {
-                            summary: 'Nested relations',
-                            description: 'Include nested relations using dot notation',
-                            value: ['profile', 'profile.address', 'orders', 'orders.items']
-                        }
+                        equals: { summary: 'Equals', value: ex.whereEquals },
+                        inList: { summary: 'In a list', value: ex.whereIn },
+                        search: { summary: 'Case-insensitive contains', value: ex.whereSearch },
+                        relationExists: { summary: 'Relation has rows', value: ex.whereExists },
                     },
-                    oneOf: [
-                        {
-                            type: 'string',
-                            description: 'JSON string representation of relations',
-                            example: '["profile","address"]'
-                        },
-                        {
-                            type: 'array',
-                            items: { type: 'string' },
-                            description: 'Array of relation names',
-                            example: ['profile', 'address']
-                        },
-                        {
-                            type: 'object',
-                            description: 'Object with relation configurations',
-                            additionalProperties: true,
-                            example: { profile: true, address: { select: ['id', 'street'] } }
-                        }
-                    ]
+                })
+                @IsOptional()
+                where?: WhereOptions | string;
+
+                @ApiPropertyOptional({
+                    type: String,
+                    description: `Relations to join, as a **JSON string**. An array of names, dot-notation for nested relations, or an object with per-relation \`select\` / \`where\` / \`joinType\` (left|inner). ${docsLink('relations')}`,
+                    examples: {
+                        array: { summary: 'Array of relation names', value: ex.relationsArray },
+                        nested: { summary: 'Nested (dot notation)', value: ex.relationsNested },
+                        object: { summary: 'Object: select + inner join', value: ex.relationsObject },
+                    },
                 })
                 @IsOptional()
                 relations?: string[] | Record<string, boolean> | string;
 
                 @ApiPropertyOptional({
-                    description: `Order of the results. Specifies the sorting order for the query results. Can be provided as an object with field:direction pairs or as a JSON string. Supports dot notation for nested properties. ${docsLink('order')}`,
+                    type: String,
+                    description: `Sort as a **JSON string**: \`column\` → \`ASC\` | \`DESC\`. Accepts aggregate aliases and dot-notation. ${docsLink('order')}`,
                     examples: {
-                        simpleOrder: {
-                            summary: 'Simple ordering',
-                            description: 'Order by single field',
-                            value: { createdAt: 'DESC' }
-                        },
-                        multipleFields: {
-                            summary: 'Multiple fields',
-                            description: 'Order by multiple fields',
-                            value: {
-                                age: 'ASC',
-                                name: 'DESC',
-                                createdAt: 'ASC'
-                            }
-                        },
-                        nestedProperties: {
-                            summary: 'Nested properties',
-                            description: 'Order using dot notation for nested properties',
-                            value: {
-                                'profile.age': 'ASC',
-                                'profile.name': 'DESC',
-                                'profile.joinedDate': 'ASC',
-                                createdAt: 'DESC'
-                            }
-                        },
-                        jsonString: {
-                            summary: 'JSON string format',
-                            description: 'Order as JSON string',
-                            value: '{"createdAt":"DESC","age":"ASC"}'
-                        }
+                        single: { summary: 'Single field', value: ex.orderSingle },
+                        multiple: { summary: 'Multiple fields', value: ex.orderMultiple },
                     },
-                    oneOf: [
-                        {
-                            type: 'string',
-                            description: 'JSON string representation of order',
-                            example: '{"createdAt":"DESC","age":"ASC"}'
-                        },
-                        {
-                            type: 'object',
-                            description: 'Object with field: direction pairs',
-                            additionalProperties: {
-                                type: 'string',
-                                enum: ['ASC', 'DESC']
-                            },
-                            example: { createdAt: 'DESC', age: 'ASC' }
-                        }
-                    ]
                 })
                 @IsOptional()
                 order?: Record<string, 'ASC' | 'DESC'> | string;
@@ -291,40 +217,35 @@ export class Validation {
                 take?: number;
 
                 @ApiPropertyOptional({
-                    description: `Fields to select from the entity. Specifies which fields should be included in the response. Can be provided as an array of field names or as a JSON string. Supports dot notation for nested properties. ${docsLink('select')}`,
+                    type: String,
+                    description: `Columns to return, as a **JSON string** array. The primary key is always included; hidden fields are dropped. ${docsLink('select')}`,
                     examples: {
-                        simpleFields: {
-                            summary: 'Simple field selection',
-                            description: 'Select specific fields',
-                            value: ['id', 'name', 'email', 'createdAt']
-                        },
-                        nestedFields: {
-                            summary: 'Nested fields',
-                            description: 'Select nested fields using dot notation',
-                            value: ['id', 'name', 'email', 'profile.age', 'profile.name', 'profile.joinedDate']
-                        },
-                        jsonString: {
-                            summary: 'JSON string format',
-                            description: 'Select fields as JSON string',
-                            value: '["id","name","email"]'
-                        }
+                        columns: { summary: 'Pick columns', value: ex.select },
                     },
-                    oneOf: [
-                        {
-                            type: 'string',
-                            description: 'JSON string representation of field names',
-                            example: '["id","name","email"]'
-                        },
-                        {
-                            type: 'array',
-                            items: { type: 'string' },
-                            description: 'Array of field names to select',
-                            example: ['id', 'name', 'email']
-                        }
-                    ]
                 })
                 @IsOptional()
                 select?: string[] | string;
+
+                @ApiPropertyOptional({
+                    type: String,
+                    description: `Per-row aggregates over a relation (count/sum/avg/min/max), as a **JSON string** of \`{ fn, field, as }\` — \`field\` is relation-qualified (e.g. \`posts.id\`); \`as\` is the alias used by \`having\`/\`order\`. ${docsLink('aggregates')}`,
+                    examples: {
+                        count: { summary: 'Count related rows', value: ex.aggOne },
+                        multiple: { summary: 'count + sum', value: ex.aggMany },
+                    },
+                })
+                @IsOptional()
+                aggregates?: any[] | string;
+
+                @ApiPropertyOptional({
+                    type: String,
+                    description: `Filter on aggregate aliases, as a **JSON string** — same operator syntax as \`where\`. ${docsLink('aggregates')}`,
+                    examples: {
+                        gt: { summary: 'Alias greater-than', value: ex.having },
+                    },
+                })
+                @IsOptional()
+                having?: Record<string, any> | string;
 
             }
             Object.defineProperty(FindManyImpl, 'name', {
@@ -340,43 +261,25 @@ export class Validation {
     static createCountsDto(options: Partial<CrudOptions>): any {
         /* istanbul ignore else */
         if (!isFalse(options.validation)) {
+            const countCols = entityFields(options.entity).columns;
+            const groupCol = countCols[0] ?? 'status';
+            const filterEx = JSON.stringify({ where: { [groupCol]: 'value' } });
+
             class CountsImpl {
                 @ApiPropertyOptional({
-                    description: `Filter conditions to apply to the count query. Supports all the same filtering options as findMany, including where conditions, soft-delete filters, etc. ${docsLink('query-operators')}`,
-                    type: ManyConditionDto,
+                    type: String,
+                    description: `Filter as a **JSON string** — the same shape as a findMany query (\`where\`, \`relations\`, …). ${docsLink('query-operators')}`,
+                    examples: {
+                        where: { summary: 'Filter by where', value: filterEx },
+                    },
                 })
                 @IsOptional()
-                @ValidateNested()
-                @Type(() => ManyConditionDto)
-                filter?: ManyConditionDto;
+                filter?: any;
 
                 @ApiPropertyOptional({
-                    description: `Group by key(s) for counting. When provided, returns counts grouped by the specified field(s). Can be a single field name or an array of field names for multiple grouping. ${docsLink('counts')}`,
-                    examples: {
-                        singleField: {
-                            summary: 'Single field grouping',
-                            description: 'Group counts by a single field',
-                            value: 'status'
-                        },
-                        multipleFields: {
-                            summary: 'Multiple fields grouping',
-                            description: 'Group counts by multiple fields',
-                            value: ['status', 'category']
-                        }
-                    },
-                    oneOf: [
-                        {
-                            type: 'string',
-                            description: 'Single field name to group by',
-                            example: 'status'
-                        },
-                        {
-                            type: 'array',
-                            items: { type: 'string' },
-                            description: 'Array of field names to group by',
-                            example: ['status', 'category']
-                        }
-                    ]
+                    type: String,
+                    description: `Column to group counts by. Repeat the parameter for multiple columns. ${docsLink('counts')}`,
+                    example: groupCol,
                 })
                 @IsOptional()
                 groupByKey?: string | string[];
@@ -395,55 +298,18 @@ export class Validation {
         /* istanbul ignore else */
 
         if (!isFalse(options.validation)) {
+            const oneFields = entityFields(options.entity);
+            const relEx = JSON.stringify(oneFields.relations.length ? oneFields.relations.slice(0, 2) : ['profile', 'posts']);
+
             class FindOneImpl {
 
                 @ApiPropertyOptional({
-                    description: `Relations to include in the query. Can be provided as an array of relation names, an object with relation configurations, or a JSON string. Supports nested relations using dot notation. ${docsLink('relations')}`,
+                    type: String,
+                    description: `Relations to join, as a **JSON string** (array of names, dot-notation for nested, or an object with per-relation \`select\` / \`joinType\`). ${docsLink('relations')}`,
                     examples: {
-                        simpleArray: {
-                            summary: 'Simple array of relation names',
-                            description: 'Include multiple relations as an array',
-                            value: ['profile', 'address', 'orders']
-                        },
-                        objectFormat: {
-                            summary: 'Object format with configuration',
-                            description: 'Include relations with additional configuration',
-                            value: {
-                                profile: true,
-                                address: { select: ['id', 'street', 'city'] },
-                                orders: { where: { status: 'active' } }
-                            }
-                        },
-                        jsonString: {
-                            summary: 'JSON string format',
-                            description: 'Relations as JSON string',
-                            value: '["profile","address"]'
-                        },
-                        nestedRelations: {
-                            summary: 'Nested relations',
-                            description: 'Include nested relations using dot notation',
-                            value: ['profile', 'profile.address', 'orders', 'orders.items']
-                        }
+                        array: { summary: 'Array of relation names', value: relEx },
+                        nested: { summary: 'Nested (dot notation)', value: '["posts.comments","profile.addresses"]' },
                     },
-                    oneOf: [
-                        {
-                            type: 'string',
-                            description: 'JSON string representation of relations',
-                            example: '["profile","address"]'
-                        },
-                        {
-                            type: 'array',
-                            items: { type: 'string' },
-                            description: 'Array of relation names',
-                            example: ['profile', 'address']
-                        },
-                        {
-                            type: 'object',
-                            description: 'Object with relation configurations',
-                            additionalProperties: true,
-                            example: { profile: true, address: { select: ['id', 'street'] } }
-                        }
-                    ]
                 })
                 @IsOptional()
                 relations?: any[] | Record<string, boolean> | string;

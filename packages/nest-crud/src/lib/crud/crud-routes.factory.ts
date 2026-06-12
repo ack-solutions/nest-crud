@@ -360,7 +360,10 @@ export class CrudRoutesFactory {
     protected reorderHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function reorder(dto: any) {
             checkService(this);
-            return this.service.reorder(dto);
+            // Body is `{ ids: [...] }` (the validated DTO) or a raw id array (when
+            // validation is disabled). Pass the array through to the service.
+            const ids = Array.isArray(dto) ? dto : dto?.ids;
+            return this.service.reorder(ids);
         };
     }
 

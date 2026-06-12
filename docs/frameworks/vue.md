@@ -1,7 +1,8 @@
 # Vue
 
-Use [`@ackplus/nest-crud-request`](../querying.md) to build queries and any HTTP
-library (here, `axios`) to send them.
+Use [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request)
+to build queries and any HTTP library (here, `axios`) to send them. New to the query
+format? Read the [Querying guide](../querying.md) for the concepts.
 
 ```bash
 npm install @ackplus/nest-crud-request axios
@@ -83,3 +84,11 @@ const { items, total, loading } = useUsers(page);
 - Ids are **UUID strings**.
 - There's **no `/api` prefix** unless you add one.
 - With Pinia, store `items` + `total` and page from `total`.
+
+## Links
+
+- 📦 [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request) (npm) ·
+  [source](https://github.com/ack-solutions/nest-crud/tree/main/packages/nest-crud-request)
+- 📖 [Querying guide](../querying.md) — every operator, relations, aggregates, `having`
+- 🧩 [All packages & links](../packages.md)
+- Other clients: [React](./react.md) · [Angular](./angular.md) · [Flutter / Dart](./flutter.md)

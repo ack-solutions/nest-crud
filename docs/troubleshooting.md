@@ -45,6 +45,28 @@ Check the spelling, and for relation columns include the relation:
 
 `$contArr` and `$intersectsArr` are PostgreSQL-only and return 400 elsewhere.
 
+## An aggregate or `having` returns 400
+
+- The aggregate `field` must be a **relation path** (`posts.id`), not a plain column.
+- The `as` alias must match `^[A-Za-z_][A-Za-z0-9_]*$` and not collide with a real column.
+- A `having` key must reference an **alias you defined** in `aggregates` for the same
+  request. See [Querying → Aggregates](./querying.md#aggregates).
+
+## A column I expected is missing / a field returns 400 "unknown field"
+
+It may be **hidden**. Fields marked with [`@CrudHidden()`](./querying.md#hiding-sensitive-fields)
+or listed in `@Crud({ hiddenFields })` are stripped from responses and rejected in
+`where` / `order` / `aggregates` / `relations` — by design, with the same error as an
+unknown field. Check your entity for `@CrudHidden()` and the controller for `hiddenFields`.
+
+## My Flutter/JS client sends a query the server rejects
+
+The client builders ([`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request),
+[`nest_crud_request`](https://pub.dev/packages/nest_crud_request)) emit the exact wire
+format the server parses — keep the client version in step with the server. Both
+clients are pinned to the server's operator set by drift-guard tests, so a mismatch
+usually means a version skew. See [Packages & links](./packages.md).
+
 ## Peer dependency warnings on install
 
 The package peer-depends on NestJS 10/11, TypeORM 0.3, `class-validator`,

@@ -62,9 +62,32 @@ describe('Swagger contract', () => {
         );
     });
 
-    it('exposes findMany query parameters', () => {
-        const params = (doc.paths['/users'].get.parameters ?? []).map((p: any) => p.name);
-        expect(params).toEqual(expect.arrayContaining(['where', 'relations', 'take', 'withDeleted']));
+    it('exposes findMany query parameters (incl. aggregates/having) with examples and no duplicates', () => {
+        const allParams = (doc.paths['/users'].get.parameters ?? []) as any[];
+        const names = allParams.map((p) => p.name);
+
+        expect(names).toEqual(
+            expect.arrayContaining(['where', 'relations', 'order', 'select', 'aggregates', 'having', 'take', 'skip', 'withDeleted', 'onlyDeleted']),
+        );
+
+        // No duplicate query-param names in the generated document.
+        const queryNames = allParams.filter((p) => p.in === 'query').map((p) => p.name);
+        expect(queryNames.length).toBe(new Set(queryNames).size);
+
+        // Examples are present so "Try it out" is usable.
+        const where = allParams.find((p) => p.name === 'where');
+        expect(where.examples ?? where.example ?? where.schema?.example).toBeTruthy();
+        const aggregates = allParams.find((p) => p.name === 'aggregates');
+        expect(aggregates.examples ?? aggregates.example ?? aggregates.schema?.example).toBeTruthy();
+
+        // JSON-encoded params must be documented as `type: string`, NOT object/array —
+        // otherwise Swagger UI's "Try it out" rejects the value with "must be valid JSON".
+        for (const name of ['where', 'relations', 'order', 'select', 'aggregates', 'having']) {
+            const p = allParams.find((x) => x.name === name);
+            const schema = p.schema ?? {};
+            expect(schema.type).toBe('string');
+            expect(schema.oneOf ?? schema.anyOf).toBeUndefined();
+        }
     });
 
     it('documents the id path param as a uuid', () => {
