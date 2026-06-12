@@ -12,6 +12,10 @@ export * from './lib/helper/find-query-builder';
 export * from './lib/helper/request-query-parser';
 export * from './lib/helper/where-operators';
 
+// Middleware
+export * from './lib/middleware/method-override.middleware';
+export * from './lib/middleware/method-override.module';
+
 // Base Entity
 export * from './lib/base-entity';
 export * from './lib/constants';

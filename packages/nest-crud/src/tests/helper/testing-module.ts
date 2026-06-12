@@ -29,7 +29,7 @@ const dbConfig = {
 } as any
 
 
-export async function createCrudTestingModule(crudOptions: CrudOptions): Promise<TestingModule> {
+export async function createCrudTestingModule(crudOptions: CrudOptions, extraImports: any[] = []): Promise<TestingModule> {
 
     @Crud(crudOptions)
     class UserCrudController {
@@ -40,6 +40,7 @@ export async function createCrudTestingModule(crudOptions: CrudOptions): Promise
         imports: [
             TypeOrmModule.forRoot(dbConfig),
             TypeOrmModule.forFeature([User, Profile, Post, Comment, ProfileAddress, Country, OrderedItem]),
+            ...extraImports,
         ],
         controllers: [UserCrudController],
         providers: [
