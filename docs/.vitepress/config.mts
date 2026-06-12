@@ -13,6 +13,15 @@ export default defineConfig({
     nav: [
       { text: 'Getting started', link: '/getting-started' },
       { text: 'Querying', link: '/querying' },
+      {
+        text: 'Packages',
+        items: [
+          { text: 'Overview', link: '/packages' },
+          { text: '@ackplus/nest-crud (npm)', link: 'https://www.npmjs.com/package/@ackplus/nest-crud' },
+          { text: '@ackplus/nest-crud-request (npm)', link: 'https://www.npmjs.com/package/@ackplus/nest-crud-request' },
+          { text: 'nest_crud_request (pub.dev)', link: 'https://pub.dev/packages/nest_crud_request' },
+        ],
+      },
       { text: 'Changelog', link: 'https://github.com/ack-solutions/nest-crud/blob/main/CHANGELOG.md' },
     ],
     sidebar: [
@@ -35,6 +44,7 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
+          { text: 'Packages & links', link: '/packages' },
           { text: 'Error handling', link: '/error-handling' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
         ],
@@ -45,6 +55,7 @@ export default defineConfig({
           { text: 'React', link: '/frameworks/react' },
           { text: 'Angular', link: '/frameworks/angular' },
           { text: 'Vue', link: '/frameworks/vue' },
+          { text: 'Flutter / Dart', link: '/frameworks/flutter' },
         ],
       },
     ],

@@ -1,7 +1,8 @@
 # Angular
 
-Use [`@ackplus/nest-crud-request`](../querying.md) to build queries and Angular's
-`HttpClient` to send them.
+Use [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request)
+to build queries and Angular's `HttpClient` to send them. New to the query format?
+Read the [Querying guide](../querying.md) for the concepts.
 
 ```bash
 npm install @ackplus/nest-crud-request
@@ -78,3 +79,11 @@ export class UsersComponent {
 - Ids are **UUID strings** — don't type them as `number`.
 - There's **no `/api` prefix** unless you add one.
 - For NgRx, dispatch from `UsersService.*`; the `{ items, total }` shape maps cleanly to a paginated entity state.
+
+## Links
+
+- 📦 [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request) (npm) ·
+  [source](https://github.com/ack-solutions/nest-crud/tree/main/packages/nest-crud-request)
+- 📖 [Querying guide](../querying.md) — every operator, relations, aggregates, `having`
+- 🧩 [All packages & links](../packages.md)
+- Other clients: [React](./react.md) · [Vue](./vue.md) · [Flutter / Dart](./flutter.md)

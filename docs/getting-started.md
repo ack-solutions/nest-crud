@@ -186,11 +186,29 @@ curl -X DELETE localhost:3000/users/<id>
 - Soft-delete routes (`/:id/restore`, `/:id/trash`, `/restore/bulk`, `/trash/bulk`)
   only exist when you pass `softDelete: true` to `@Crud()`.
 - List queries are capped by `maxPerPage` (default 5000).
+- The query layer ships **29 filter operators**, relations, multi-sort, and
+  **aggregates** (`count`/`sum`/`avg`/`min`/`max` over relations with `having`) — see
+  [Querying](./querying.md).
+- Lock down sensitive columns with [`@CrudHidden()`](./querying.md#hiding-sensitive-fields)
+  so they can never be selected, filtered, or sorted by clients.
+
+## Talking to your API from a client
+
+You don't have to build the JSON query strings by hand. The query builders produce
+the exact wire format the server expects, on any platform:
+
+- **JS / TS** (React, Angular, Vue, Node): [`@ackplus/nest-crud-request`](https://www.npmjs.com/package/@ackplus/nest-crud-request)
+- **Flutter / Dart**: [`nest_crud_request`](https://pub.dev/packages/nest_crud_request)
+
+See [Packages & links](./packages.md) for all three, and the framework guides below.
 
 ## Next
 
-- [Querying](./querying.md) — filters, relations, pagination, sorting, counts.
+- [Querying](./querying.md) — filters, relations, pagination, sorting, aggregates, counts.
 - [Configuration](./configuration.md) — every `@Crud()` option.
 - [Lifecycle hooks](./lifecycle-hooks.md) — `beforeCreate`, `beforeFindMany`, …
-- [Auth & guards](./auth-and-guards.md) — protect routes.
+- [Auth & guards](./auth-and-guards.md) — protect routes and hide sensitive columns.
+- [Packages & links](./packages.md) — the client query builders (JS + Flutter/Dart).
+- Client guides: [React](./frameworks/react.md) · [Angular](./frameworks/angular.md) ·
+  [Vue](./frameworks/vue.md) · [Flutter / Dart](./frameworks/flutter.md).
 - [Error handling](./error-handling.md) · [Troubleshooting](./troubleshooting.md).

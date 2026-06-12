@@ -59,3 +59,15 @@ export class AuditInterceptor implements NestInterceptor {
 For row-level rules (e.g. "users can only read their own records"), prefer a
 [lifecycle hook](./lifecycle-hooks.md) (`beforeFindMany` / `beforeFindOne`) so the
 constraint is enforced in the query itself.
+
+## Hiding sensitive columns
+
+Guards decide **who** can call a route. To control **which columns** are exposed —
+so a client can never select, filter, or sort by `passwordHash`, tokens, or
+internal flags — mark those fields hidden with `@CrudHidden()` (or
+`@Crud({ hiddenFields })`). They're stripped from responses and rejected in
+`where` / `order` / `aggregates` / `relations`.
+
+See [Querying → Hiding sensitive fields](./querying.md#hiding-sensitive-fields) for
+the full behaviour table. The two mechanisms are complementary: guards for access,
+hidden fields for data exposure.

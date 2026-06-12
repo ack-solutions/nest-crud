@@ -545,6 +545,19 @@ For the matching backend, see [`@ackplus/nest-crud`](../nest-crud/README.md).
 
 ---
 
+## Related packages
+
+| Package | Registry | For |
+| --- | --- | --- |
+| [`@ackplus/nest-crud`](../nest-crud/README.md) | [npm](https://www.npmjs.com/package/@ackplus/nest-crud) | The NestJS + TypeORM server |
+| [`nest_crud_request`](../../clients/flutter/nest_crud_request/README.md) | [pub.dev](https://pub.dev/packages/nest_crud_request) | The Dart/Flutter twin of this builder |
+
+This package and its Dart twin produce an **identical wire format** and publish
+together at one version. Full docs: <https://ack-solutions.github.io/nest-crud/> ·
+[all packages](../../docs/packages.md).
+
+---
+
 ## License
 
 MIT © Ackplus
