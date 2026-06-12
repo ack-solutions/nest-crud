@@ -41,6 +41,13 @@ Only real entity columns and resolvable relation paths are accepted in `where`.
 Check the spelling, and for relation columns include the relation:
 `relations=["profile"]&where={"profile.age":{"$gte":18}}`.
 
+## A big filter returns `414` (or the request is rejected)
+
+A long query (a `$in` with many IDs, a large saved filter) can exceed the URL limit
+that proxies/CDNs enforce (~8 KB → `414 Request-URI Too Large`). Keep reads as GET for
+the common case, and send the rare large query in a POST body handled as a GET — see
+[Large queries](./large-queries.md).
+
 ## Postgres array operators error on SQLite/MySQL
 
 `$contArr` and `$intersectsArr` are PostgreSQL-only and return 400 elsewhere.

@@ -13,6 +13,10 @@ GET /users?where={"isActive":true}&relations=["posts"]&order={"createdAt":"DESC"
 > usually build these with the [client query builder](#client-query-builder)
 > instead of hand-writing the query string.
 
+> **Very large filter?** A query too long for the URL (~8 KB, e.g. a `$in` with
+> hundreds of IDs) can be sent in a POST body and handled as a GET — see
+> [Large queries](./large-queries.md).
+
 ## Common queries (cheat sheet)
 
 Copy-paste starting points — each is explained in detail in the sections below.
