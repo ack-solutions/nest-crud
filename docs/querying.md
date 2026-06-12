@@ -377,6 +377,27 @@ await axios.get('/users', { params: qb.toObject() });
 - `.toObject()` returns params with JSON-string values (the default HTTP shape);
   `.toObject(true)` keeps nested objects; `.toJson()` returns one JSON string.
 
+### Flutter / Dart
+
+A Dart twin, **`nest_crud_request`** (in
+[`clients/flutter`](https://github.com/ack-solutions/nest-crud/tree/main/clients/flutter/nest_crud_request)),
+mirrors this builder and produces the same query strings — use it from Flutter:
+
+```dart
+final params = (QueryBuilder()
+      ..where('status', 'active')
+      ..whereOp('age', WhereOperator.gte, 18)
+      ..addAggregate(fn: AggregateFn.count, field: 'posts.id', as: 'postCount')
+      ..havingOp('postCount', WhereOperator.gt, 5)
+      ..addOrder('createdAt', OrderDirection.desc)
+      ..setTake(20))
+    .toQueryParameters();
+
+await dio.get('/users', queryParameters: params);
+```
+
+It's published to pub.dev at the same version as the JS packages.
+
 ## Pagination
 
 `take` (page size) and `skip` (offset) control the window. `findMany` returns the

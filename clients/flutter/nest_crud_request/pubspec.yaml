@@ -1,0 +1,20 @@
+name: nest_crud_request
+description: >-
+  Framework-agnostic query builder for @ackplus/nest-crud REST APIs — build
+  filters, relations, aggregates, ordering and pagination for Flutter and Dart.
+version: 1.1.42
+repository: https://github.com/ack-solutions/nest-crud
+homepage: https://ack-solutions.github.io/nest-crud
+topics:
+  - rest
+  - query-builder
+  - api
+  - nestjs
+  - flutter
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.24.0
