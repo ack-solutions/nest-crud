@@ -8,7 +8,7 @@ import { AggregateQueryBuilder } from '../helper/aggregate-query-builder';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudMessages, CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
+import { CrudActionsEnum, CrudMessages, CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 import { CrudConfigService } from './crud-config.service';
 
@@ -16,6 +16,19 @@ import { CrudConfigService } from './crud-config.service';
 export class CrudService<T extends BaseEntity> {
 
     options: CrudOptions;
+
+    /**
+     * Column written by `reorder()`. Defaults to `order` (the column on
+     * `BaseEntityWithOrder`). Override in a subclass for entities that sort on a
+     * different column:
+     *
+     * ```ts
+     * class BlockService extends CrudService<Block> {
+     *   protected reorderColumn = 'sortOrder';
+     * }
+     * ```
+     */
+    protected reorderColumn = 'order';
 
     constructor(readonly repository: Repository<T>) { }
 
@@ -287,6 +300,60 @@ export class CrudService<T extends BaseEntity> {
      * - Validate the saved entity (e.g. check for required fields)
      */
     protected async afterRestoreMany(ids: ID[]) {
+        return ids;
+    }
+
+    /**
+     * Hook that augments the WHERE used by every mutation-by-criteria method:
+     * `update` / `delete` / `deleteFromTrash` / `restore` and their bulk variants.
+     *
+     * This is the **write-side counterpart** to `beforeFindMany` / `beforeFindOne`.
+     * Whatever criteria you return is what loads AND mutates the row(s), so a row
+     * that doesn't match becomes invisible to writes: `update`/`delete` return
+     * `404`, and the bulk variants silently skip it. Use it to make mutations
+     * tenant-safe in one place instead of guarding each per-action hook.
+     *
+     * ```ts
+     * // Every mutation is scoped to the caller's tenant.
+     * protected async beforeMutate(criteria: FindOptionsWhere<Block>) {
+     *   return { ...criteria, propertyId: this.ctx.propertyId };
+     * }
+     * ```
+     *
+     * The criteria is column-level (TypeORM's `delete`/`update`/`restore` WHERE),
+     * so use plain columns — no relation joins. For single-row mutations `criteria`
+     * is `{ id }`; for bulk it's `{ id: In(ids) }`.
+     *
+     * @param criteria The id/where criteria the mutation is about to run.
+     * @param _action  Which mutation is running (a `CrudActionsEnum` value).
+     * @returns The criteria to use (return it unchanged to keep default behaviour).
+     */
+    protected async beforeMutate(
+        criteria: FindOptionsWhere<T>,
+        _action: CrudActionsEnum,
+    ): Promise<FindOptionsWhere<T>> {
+        return criteria;
+    }
+
+    /**
+     * Hook that runs before `reorder()` writes the new positions.
+     *
+     * Return a narrowed/transformed id list — e.g. keep only ids the caller owns,
+     * so `reorder` becomes tenant-safe (it can't be scoped by a WHERE because it
+     * writes positions per id):
+     *
+     * ```ts
+     * protected async beforeReorder(ids: ID[]) {
+     *   const owned = await this.repository.find({
+     *     where: { id: In(ids), propertyId: this.ctx.propertyId } as any,
+     *     select: ['id'],
+     *   });
+     *   const ownedIds = new Set(owned.map(r => r.id));
+     *   return ids.filter(id => ownedIds.has(id as string)); // preserves order
+     * }
+     * ```
+     */
+    protected async beforeReorder(ids: ID[]): Promise<ID[]> {
         return ids;
     }
 
@@ -578,8 +645,8 @@ export class CrudService<T extends BaseEntity> {
      * Throws `NotFoundException` if record doesn't exist.
      */
     async update(criteria: ID | FindOptionsWhere<T>, data: Partial<T>, ..._others: any[]) {
-        criteria = this.parseFindOptions(criteria);
-        const oldData = await this.repository.findOne({ where: criteria });
+        const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.UPDATE);
+        const oldData = await this.repository.findOne({ where });
         if (!oldData) {
             throw new NotFoundException(`${this.repository.metadata.name} not found`);
         }
@@ -591,7 +658,7 @@ export class CrudService<T extends BaseEntity> {
         } as DeepPartial<T>);
         await this.repository.save(entity);
 
-        const result = await this.repository.findOne({ where: criteria }) as T;
+        const result = await this.repository.findOne({ where }) as T;
 
         await this.afterSave(result, oldData, data);
         await this.afterUpdate(result, oldData, data);
@@ -620,10 +687,10 @@ export class CrudService<T extends BaseEntity> {
                 const id = item.id;
                 if (!id) continue;
 
-                const criteria = this.parseFindOptions(id);
+                const where = await this.resolveMutateWhere(id, CrudActionsEnum.UPDATE_MANY);
 
                 const oldData = await manager.findOne(this.repository.target as any, {
-                    where: criteria,
+                    where,
                 });
 
                 if (!oldData) continue;
@@ -637,7 +704,7 @@ export class CrudService<T extends BaseEntity> {
                 } as DeepPartial<T>));
 
                 const updated = await manager.findOne(this.repository.target as any, {
-                    where: criteria,
+                    where,
                 });
 
                 if (updated) {
@@ -661,19 +728,19 @@ export class CrudService<T extends BaseEntity> {
      * Throws `NotFoundException` if record doesn't exist.
      */
     async delete(criteria: ID | FindOptionsWhere<T>, softDelete?: boolean, ..._others: any) {
-        criteria = this.parseFindOptions(criteria);
+        const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.DELETE);
 
-        const oldData = await this.repository.findOne({ where: criteria });
+        const oldData = await this.repository.findOne({ where });
         if (!oldData) {
-            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(criteria)} not found`);
+            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(where)} not found`);
         }
 
         await this.beforeDelete(oldData);
 
         if (softDelete) {
-            await this.repository.softDelete(criteria);
+            await this.repository.softDelete(where);
         } else {
-            await this.repository.delete(criteria);
+            await this.repository.delete(where);
         }
 
         await this.afterDelete(oldData);
@@ -701,10 +768,14 @@ export class CrudService<T extends BaseEntity> {
         }
         const ids = await this.beforeDeleteMany(params.ids);
         if (ids?.length > 0) {
+            const where = await this.resolveMutateWhere(
+                { id: In(ids) } as FindOptionsWhere<T>,
+                CrudActionsEnum.DELETE_MANY,
+            );
             if (softDelete) {
-                await this.repository.softDelete({ id: In(ids) as any });
+                await this.repository.softDelete(where);
             } else {
-                await this.repository.delete({ id: In(ids) as any });
+                await this.repository.delete(where);
             }
             await this.afterDeleteMany(ids);
             return {
@@ -728,20 +799,20 @@ export class CrudService<T extends BaseEntity> {
      * - Reads with `withDeleted: true` so it can target soft-deleted rows.
      */
     async deleteFromTrash(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
-        criteria = this.parseFindOptions(criteria);
+        const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.DELETE_FROM_TRASH);
 
         const oldData = await this.repository.findOne({
-            where: criteria,
+            where,
             withDeleted: true,
         });
 
         if (!oldData) {
-            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(criteria)} not found`);
+            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(where)} not found`);
         }
 
         await this.beforeDeleteFromTrash(oldData);
 
-        await this.repository.delete(criteria);
+        await this.repository.delete(where);
         await this.afterDeleteFromTrash(oldData);
         return {
             success: true,
@@ -764,7 +835,11 @@ export class CrudService<T extends BaseEntity> {
         }
         const ids = await this.beforeDeleteFromTrashMany(params.ids);
         if (ids?.length > 0) {
-            await this.repository.delete({ id: In(ids) as any });
+            const where = await this.resolveMutateWhere(
+                { id: In(ids) } as FindOptionsWhere<T>,
+                CrudActionsEnum.DELETE_FROM_TRASH_MANY,
+            );
+            await this.repository.delete(where);
             await this.afterDeleteFromTrashMany(ids);
         }
         return {
@@ -783,19 +858,19 @@ export class CrudService<T extends BaseEntity> {
      * - Reads with `withDeleted: true` so it can restore soft-deleted rows.
      */
     async restore(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
-        criteria = this.parseFindOptions(criteria);
+        const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.RESTORE);
 
         const oldData = await this.repository.findOne({
-            where: criteria,
+            where,
             withDeleted: true,
         });
         if (!oldData) {
-            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(criteria)} not found`);
+            throw new NotFoundException(`${this.repository.metadata.name} with criteria ${JSON.stringify(where)} not found`);
         }
 
         await this.beforeRestore(oldData);
 
-        await this.repository.restore(criteria);
+        await this.repository.restore(where);
 
         await this.afterRestore(oldData);
         return {
@@ -813,9 +888,11 @@ export class CrudService<T extends BaseEntity> {
     async restoreMany(params: { ids: ID[] }, ..._others: any[]) {
         const ids = await this.beforeRestoreMany(params.ids);
         if (ids?.length > 0) {
-            await this.repository.restore({
-                id: In(ids) as any,
-            });
+            const where = await this.resolveMutateWhere(
+                { id: In(ids) } as FindOptionsWhere<T>,
+                CrudActionsEnum.RESTORE_MANY,
+            );
+            await this.repository.restore(where);
             await this.afterRestoreMany(ids);
         }
         return {
@@ -825,20 +902,42 @@ export class CrudService<T extends BaseEntity> {
     }
 
     /**
-     * Reorder records by updating their `order` field.
+     * Reorder records by writing their new position into the `reorderColumn`.
      *
      * - Input: ordered array of ids
-     * - Output: void
+     * - Output: `{ success, message }`
+     *
+     * Hooks / config:
+     * - `beforeReorder(ids)` runs first — narrow the list (e.g. to tenant-owned
+     *   ids) to make reorder tenant-safe.
+     * - `reorderColumn` (default `order`) selects the column written; override it
+     *   for entities that sort on a different column (e.g. `sortOrder`).
      *
      * Notes:
-     * - Expects the entity to have an `order` column.
-     * - Writes \(N\) updates (one per id).
+     * - Throws `400` if `reorderColumn` isn't a real column on the entity.
+     * - Writes \(N\) updates (one per id) inside a transaction.
      */
     async reorder(order: ID[], ..._others: any[]) {
+        order = await this.beforeReorder(order ?? []);
+        if (!order?.length) {
+            return {
+                success: true,
+                message: this.msg('reordered', 'Successfully reordered'),
+            };
+        }
+
+        const column = this.reorderColumn;
+        const hasColumn = this.repository.metadata.columns.some(c => c.propertyName === column);
+        if (!hasColumn) {
+            throw new BadRequestException(
+                `Reorder column "${column}" does not exist on ${this.repository.metadata.name}. Set "reorderColumn" on the service to the entity's sort column.`,
+            );
+        }
+
         // Wrap in a transaction so a partial reorder is never committed on failure.
         await this.repository.manager.transaction(async (manager) => {
             for (let i = 0; i < order.length; i++) {
-                await manager.update(this.repository.target, order[i] as any, { order: i } as any);
+                await manager.update(this.repository.target, order[i] as any, { [column]: i } as any);
             }
         });
         return {
@@ -858,6 +957,17 @@ export class CrudService<T extends BaseEntity> {
             criteria = { id: criteria } as any;
         }
         return criteria as FindOptionsWhere<T>;
+    }
+
+    /**
+     * Normalize criteria and run it through `beforeMutate`, so every mutation
+     * loads and writes through the same (optionally scoped) WHERE.
+     */
+    protected async resolveMutateWhere(
+        criteria: ID | FindOptionsWhere<T>,
+        action: CrudActionsEnum,
+    ): Promise<FindOptionsWhere<T>> {
+        return this.beforeMutate(this.parseFindOptions(criteria), action);
     }
 
 }

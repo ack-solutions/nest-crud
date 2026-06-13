@@ -60,6 +60,15 @@ For row-level rules (e.g. "users can only read their own records"), prefer a
 [lifecycle hook](./lifecycle-hooks.md) (`beforeFindMany` / `beforeFindOne`) so the
 constraint is enforced in the query itself.
 
+> ⚠️ **Scope writes too, not just reads.** Read hooks don't cover mutations: by
+> default `update` / `delete` / `restore` (and the bulk variants) match the row by
+> **id alone**, so a guard that only checks the route plus read-only scoping still
+> leaves `PUT`/`DELETE /:id` cross-tenant exploitable. Close it by scoping the
+> mutation criteria with
+> [`beforeMutate`](./lifecycle-hooks.md#securing-mutations-write-side-scoping)
+> (and `beforeReorder` for `reorder`) — ideally on a shared base service so every
+> resource is isolated at once.
+
 ## Hiding sensitive columns
 
 Guards decide **who** can call a route. To control **which columns** are exposed —
