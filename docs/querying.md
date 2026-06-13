@@ -471,6 +471,9 @@ curl -X PUT localhost:3000/items/reorder -H 'content-type: application/json' \
 
 ## Extending the service
 
+> Adding **new endpoints**, **overriding** generated routes, or a **streaming export**?
+> See [Custom routes & overrides](./custom-routes.md).
+
 `CrudService` exposes override points so you can customise behaviour in a subclass
 rather than patching the library:
 

@@ -37,6 +37,7 @@ export default defineConfig({
         items: [
           { text: 'Querying', link: '/querying' },
           { text: 'Large queries', link: '/large-queries' },
+          { text: 'Custom routes & overrides', link: '/custom-routes' },
           { text: 'Lifecycle hooks', link: '/lifecycle-hooks' },
           { text: 'Soft delete', link: '/soft-delete' },
           { text: 'Auth & guards', link: '/auth-and-guards' },
