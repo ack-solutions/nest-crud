@@ -4,6 +4,45 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-06-13
+
+Non-breaking. A `@nestjs/swagger@11.4` runtime-crash fix and tenant-scopable
+mutations. All packages (`@ackplus/nest-crud`, `@ackplus/nest-crud-request`,
+`nest_crud_request`) release together at this version.
+
+### Added
+
+- **Write-side scoping hooks** — `beforeMutate(criteria, action)` augments the WHERE
+  for `update` / `delete` / `deleteFromTrash` / `restore` and their bulk variants
+  (the write-side counterpart to `beforeFindMany` / `beforeFindOne`), so mutations
+  can be tenant-scoped in one place. `reorder` gains a `beforeReorder(ids)` hook and
+  a configurable `reorderColumn` (default `order`, e.g. set `sortOrder`); it now
+  throws `400` if that column doesn't exist. See
+  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
+
+### Fixed
+
+- **Runtime crash on `@nestjs/swagger@11.4.x`**: the Swagger helper deep-imported
+  `@nestjs/swagger/dist/constants`, which swagger 11 no longer exposes in its
+  `exports` map — Node threw `ERR_PACKAGE_PATH_NOT_EXPORTED` at import time for
+  consumers on that version (it compiled fine because `tsc` ignores `exports`). The
+  helper now inlines the stable metadata keys instead. A new test guards against any
+  `@nestjs/*/dist` or `/lib` deep import being reintroduced.
+
+### Security
+
+- **Mutations can now be tenant-scoped** via the new `beforeMutate` hook. Previously
+  `update` / `delete` / `deleteFromTrash` / `restore` (and bulk) located rows by
+  **id alone**, independent of the read hooks — so scoping only `beforeFindMany` /
+  `beforeFindOne` left `PUT`/`DELETE /:id` cross-tenant exploitable (IDOR) unless the
+  consumer guarded each write hook. Override `beforeMutate` (ideally on a base
+  service) to AND a tenant column into every mutation's WHERE; non-matching rows then
+  return `404` (single) or are skipped (bulk). Default behaviour is unchanged.
+  `reorder` is likewise scopable via `beforeReorder`. See
+  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
+
+---
+
 ## [2.1.0] — unreleased (v2 track)
 
 **Additive and non-breaking** over `2.0.0` — no code changes required to upgrade.
@@ -36,13 +75,6 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   `unregister()` to add operators without forking.
 - **Service extension points** — overridable `createFindQueryBuilder()` and
   `createAggregateQueryBuilder()`.
-- **Write-side scoping hooks** — `beforeMutate(criteria, action)` augments the WHERE
-  for `update` / `delete` / `deleteFromTrash` / `restore` and their bulk variants
-  (the write-side counterpart to `beforeFindMany` / `beforeFindOne`), so mutations
-  can be tenant-scoped in one place. `reorder` gains a `beforeReorder(ids)` hook and
-  a configurable `reorderColumn` (default `order`, e.g. set `sortOrder`); it now
-  throws `400` if that column doesn't exist. See
-  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
 - Client builder (`@ackplus/nest-crud-request`): `addAggregate()`, `having()` /
   `andHaving()` / `orHaving()`, and `removeAggregate()`; aggregates / having are
   serialised in `toObject()` / `toJson()`. `addRelation()` now supports `joinType`
@@ -81,24 +113,6 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   unwraps `ids`. The documented body is `{ "ids": [...] }` (the old raw-array
   example was incorrect). Covered by a new HTTP reorder test and the Postgres e2e
   suite in `apps/example-app`.
-- **Runtime crash on `@nestjs/swagger@11.4.x`**: the Swagger helper deep-imported
-  `@nestjs/swagger/dist/constants`, which swagger 11 no longer exposes in its
-  `exports` map — Node threw `ERR_PACKAGE_PATH_NOT_EXPORTED` at import time for
-  consumers on that version (it compiled fine because `tsc` ignores `exports`). The
-  helper now inlines the stable metadata keys instead. A new test guards against any
-  `@nestjs/*/dist` or `/lib` deep import being reintroduced.
-
-### Security
-
-- **Mutations can now be tenant-scoped** via the new `beforeMutate` hook. Previously
-  `update` / `delete` / `deleteFromTrash` / `restore` (and bulk) located rows by
-  **id alone**, independent of the read hooks — so scoping only `beforeFindMany` /
-  `beforeFindOne` left `PUT`/`DELETE /:id` cross-tenant exploitable (IDOR) unless the
-  consumer guarded each write hook. Override `beforeMutate` (ideally on a base
-  service) to AND a tenant column into every mutation's WHERE; non-matching rows then
-  return `404` (single) or are skipped (bulk). Default behaviour is unchanged.
-  `reorder` is likewise scopable via `beforeReorder`. See
-  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
 
 ### Notes
 

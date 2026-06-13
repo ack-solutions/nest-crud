@@ -1,3 +1,9 @@
+## 1.3.0
+
+- Version aligned with the `@ackplus/nest-crud` 1.3.0 release (server-side: a
+  `@nestjs/swagger@11.4` import-crash fix and tenant-scopable mutations). No changes
+  to the Dart query builder itself — all packages release together at one version.
+
 ## 1.2.0
 
 - Initial release. Dart / Flutter query builder for `@ackplus/nest-crud`, the twin
