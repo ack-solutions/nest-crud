@@ -23,7 +23,7 @@ For validation errors, `message` is an array of strings.
 - Malformed JSON in `where` / `relations` / `order` / `select` / `aggregates` / `having`.
 - An **unknown filter field** in `where` (only real columns and relation paths are allowed).
 - An **unknown `order` key** — a column/alias the query doesn't expose. (Unknown order
-  keys are rejected rather than silently ignored; see [Migration](https://github.com/ack-solutions/nest-crud/blob/main/MIGRATION.md).)
+  keys are rejected rather than silently ignored; see [Migration](./migration.md).)
 - A [**hidden field**](./querying.md#hiding-sensitive-fields) (`@CrudHidden()` /
   `hiddenFields`) named in `where` / `order` / `relations` / an aggregate `field`.
   The error is identical to "unknown field" so the field's existence isn't revealed.

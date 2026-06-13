@@ -68,7 +68,7 @@ The two client builders mirror each other method-for-method and operator-for-ope
 
 - GitHub: <https://github.com/ack-solutions/nest-crud>
 - Changelog: <https://github.com/ack-solutions/nest-crud/blob/main/CHANGELOG.md>
-- Migration (v1 → v2): <https://github.com/ack-solutions/nest-crud/blob/main/MIGRATION.md>
+- Migration (v1 → v2): [Migration guide](./migration.md)
 - Example app (real Postgres): [`apps/example-app`](https://github.com/ack-solutions/nest-crud/tree/main/apps/example-app)
 
 A single git tag (`1.2.3`) publishes the npm packages **and** the pub.dev package
