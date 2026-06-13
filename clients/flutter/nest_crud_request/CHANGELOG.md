@@ -1,3 +1,9 @@
+## 2.0.1
+
+- Version aligned with the `@ackplus/nest-crud` 2.0.1 release (server-side:
+  `CrudConfigService` is now exported + `NestCrudModule.forRoot`). No changes to the
+  Dart query builder itself — all packages release together at one version.
+
 ## 1.3.0
 
 - Version aligned with the `@ackplus/nest-crud` 1.3.0 release (server-side: a

@@ -4,7 +4,10 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.1] — 2026-06-13
+
+Patch on the 2.0.0 (v2) line. Makes the documented global-config entrypoint actually
+importable. All packages release together at this version.
 
 ### Added
 
