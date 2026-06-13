@@ -8,6 +8,7 @@ export * from './lib/interface/typeorm';
 
 // Services
 export * from './lib/service/crud-service';
+export * from './lib/service/crud-config.service';
 export * from './lib/helper/find-query-builder';
 export * from './lib/helper/request-query-parser';
 export * from './lib/helper/where-operators';

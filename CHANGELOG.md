@@ -4,6 +4,22 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`NestCrudModule.forRoot(config)`** — register global CRUD defaults (`maxPerPage`
+  / `maxPageSize`, i18n `messages`, route overrides) the idiomatic NestJS way (in a
+  module's `imports`), equivalent to calling `CrudConfigService.load(config)` at
+  bootstrap.
+
+### Fixed
+
+- **`CrudConfigService` is now exported from the package barrel.** The documented
+  global-config entrypoint — `CrudConfigService.load({ maxPageSize, … })` — was
+  declared but not re-exported from `index`, so the documented import didn't resolve.
+  It's now part of the public API (with a regression test importing it from the entry).
+
 ## [1.3.0] — 2026-06-13
 
 Non-breaking. A `@nestjs/swagger@11.4` runtime-crash fix and tenant-scopable

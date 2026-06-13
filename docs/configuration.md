@@ -99,19 +99,42 @@ English default.
 })
 ```
 
-## Global defaults — `CrudConfigService`
+## Global defaults — `CrudConfigService` / `NestCrudModule.forRoot`
 
-Set defaults for every controller once, at bootstrap:
+Set defaults for every controller once. The idiomatic way is `NestCrudModule.forRoot`
+in your module:
+
+```ts
+import { NestCrudModule } from '@ackplus/nest-crud';
+
+@Module({
+  imports: [
+    NestCrudModule.forRoot({
+      maxPerPage: 1000,      // or the legacy `maxPageSize` alias
+      // messages: { ... },  // default response messages for all controllers
+      // routes: { ... },    // override default route config globally
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Or call the underlying loader directly at bootstrap — equivalent:
 
 ```ts
 import { CrudConfigService } from '@ackplus/nest-crud';
 
-CrudConfigService.load({
-  maxPerPage: 1000,        // or the legacy `maxPageSize` alias
-  // messages: { ... },    // default response messages for all controllers
-  // routes: { ... },      // override default route config globally
-});
+CrudConfigService.load({ maxPerPage: 1000 });
 ```
+
+Per-controller `@Crud({ ... })` options always override these globals.
+
+::: tip Call order
+`maxPerPage` and `messages` are read per request, so they apply no matter when you
+load them. Global **`routes`** overrides are read when each `@Crud()` decorator runs
+(at import time), so load them **before** your CRUD controllers are imported — e.g.
+`forRoot` at the top of your root module's `imports`.
+:::
 
 ## See also
 
