@@ -1,6 +1,7 @@
-import { Get, Param } from '@nestjs/common';
+import { Get, Param, Query, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Crud } from '@ackplus/nest-crud';
+import type { Response } from 'express';
 import { User } from '../database/entities/user.entity';
 import { UserService } from './user.service';
 
@@ -88,6 +89,30 @@ export class UserController {
   })
   async getUserByEmail(@Param('email') email: string): Promise<User | null> {
     return this.service.findByEmail(email);
+  }
+
+  // Streaming export — reuses the same query as GET /users (where/relations/order/…)
+  // but streams rows one-by-one as NDJSON, so large exports stay memory-safe.
+  // Example: GET /users/export?where={"isActive":{"$eq":true}}&order={"createdAt":"DESC"}
+  @Get('export')
+  @ApiOperation({
+    summary: 'Stream all matching users as NDJSON',
+    description:
+      'Same query params as GET /users, but streams the rows one-by-one as ' +
+      'newline-delimited JSON (application/x-ndjson). Memory-safe for large exports.',
+  })
+  async exportUsers(@Query() query: Record<string, any>, @Res() res: Response): Promise<void> {
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="users.ndjson"');
+    try {
+      for await (const user of this.service.exportAll(query)) {
+        res.write(JSON.stringify(user) + '\n'); // one row per line
+      }
+      res.end();
+    } catch (err) {
+      // headers are already sent mid-stream, so abort the connection on error
+      res.destroy(err as Error);
+    }
   }
 }
 
