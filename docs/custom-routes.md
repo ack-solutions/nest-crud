@@ -40,6 +40,56 @@ export class UserController {
 }
 ```
 
+## Add an endpoint to *every* CRUD resource (base controller)
+
+To add the same endpoint to many `@Crud()` controllers at once, put it on a base
+controller they all extend. Inherited routes register, and `this.service` resolves
+to each child's own service.
+
+```ts
+// base-crud.controller.ts
+import { Get, Query } from '@nestjs/common';
+import { CrudService, BaseEntity } from '@ackplus/nest-crud';
+
+export abstract class BaseCrudController<T extends BaseEntity> {
+  abstract service: CrudService<T>;
+
+  @Get('summary/count')                         // GET /<path>/summary/count on every resource
+  async count(@Query() query: Record<string, any>) {
+    const { total } = await this.service.findMany(query);
+    return { total };
+  }
+}
+```
+
+```ts
+// each resource gets the shared route for free
+@Crud({ entity: User, path: 'users' })
+export class UserController extends BaseCrudController<User> {
+  constructor(public service: UserService) { super(); }
+}
+
+@Crud({ entity: Post, path: 'posts' })
+export class PostController extends BaseCrudController<Post> {
+  constructor(public service: PostService) { super(); }
+}
+```
+
+Now both `GET /users/summary/count` and `GET /posts/summary/count` exist. Pair it
+with a [base service](#recipe-streaming-export) (e.g. a shared `exportAll`) so the
+route **and** its logic are written once — e.g. a base `@Get('export/stream')` that
+streams every resource.
+
+::: warning One rule: use a multi-segment path
+Inherited routes register **after** the generated ones, so a **single-segment**
+shared path (like `@Get('export')`) would be captured by the generated `/:id`
+(`findOne('export')` → 404). Give shared base routes a **two-segment** path
+(`summary/count`, `export/stream`) and they're safe. Routes declared **directly** on
+a controller don't have this constraint — they register before `/:id`, so any path
+works; so if you need a single-segment shared path, declare that one on each
+controller (one line) instead.
+:::
+
 ## Override a generated endpoint
 
 **(a) Override the service method** — keep the route, change the logic. Reuse the base
