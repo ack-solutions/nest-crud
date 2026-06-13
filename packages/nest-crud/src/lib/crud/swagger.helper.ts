@@ -1,5 +1,4 @@
 import { HttpStatus } from '@nestjs/common';
-import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { getSchemaPath, ApiProperty } from '@nestjs/swagger';
 import { R } from './reflection.helper';
 import { CrudActionsEnum } from '../interface/crud';
@@ -7,6 +6,26 @@ import { objKeys } from '../utils';
 
 
 const pluralize = require('pluralize');
+
+/**
+ * Swagger metadata keys used by the CRUD factory.
+ *
+ * These mirror `@nestjs/swagger`'s internal `DECORATORS` map. We intentionally do
+ * NOT import them from `@nestjs/swagger/dist/constants`: `@nestjs/swagger@11`
+ * restricts its `exports` to `.`, `./plugin`, and `./package.json`, so Node blocks
+ * that deep import at runtime (`ERR_PACKAGE_PATH_NOT_EXPORTED`) even though `tsc`
+ * compiles it. The constant isn't re-exported from the public API, so we inline
+ * the keys we use. They're part of swagger's metadata contract and have been
+ * byte-identical across v8–v11 — the OpenAPI explorer reads/writes metadata under
+ * exactly these strings.
+ */
+const DECORATORS = {
+    API_OPERATION: 'swagger/apiOperation',
+    API_RESPONSE: 'swagger/apiResponse',
+    API_TAGS: 'swagger/apiUseTags',
+    API_PARAMETERS: 'swagger/apiParameters',
+    API_EXTRA_MODELS: 'swagger/apiExtraModels',
+} as const;
 
 /**
  * Reusable Swagger response model classes for optimization
