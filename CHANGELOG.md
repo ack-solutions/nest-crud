@@ -36,6 +36,13 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   `unregister()` to add operators without forking.
 - **Service extension points** — overridable `createFindQueryBuilder()` and
   `createAggregateQueryBuilder()`.
+- **Write-side scoping hooks** — `beforeMutate(criteria, action)` augments the WHERE
+  for `update` / `delete` / `deleteFromTrash` / `restore` and their bulk variants
+  (the write-side counterpart to `beforeFindMany` / `beforeFindOne`), so mutations
+  can be tenant-scoped in one place. `reorder` gains a `beforeReorder(ids)` hook and
+  a configurable `reorderColumn` (default `order`, e.g. set `sortOrder`); it now
+  throws `400` if that column doesn't exist. See
+  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
 - Client builder (`@ackplus/nest-crud-request`): `addAggregate()`, `having()` /
   `andHaving()` / `orHaving()`, and `removeAggregate()`; aggregates / having are
   serialised in `toObject()` / `toJson()`. `addRelation()` now supports `joinType`
@@ -74,6 +81,18 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   unwraps `ids`. The documented body is `{ "ids": [...] }` (the old raw-array
   example was incorrect). Covered by a new HTTP reorder test and the Postgres e2e
   suite in `apps/example-app`.
+
+### Security
+
+- **Mutations can now be tenant-scoped** via the new `beforeMutate` hook. Previously
+  `update` / `delete` / `deleteFromTrash` / `restore` (and bulk) located rows by
+  **id alone**, independent of the read hooks — so scoping only `beforeFindMany` /
+  `beforeFindOne` left `PUT`/`DELETE /:id` cross-tenant exploitable (IDOR) unless the
+  consumer guarded each write hook. Override `beforeMutate` (ideally on a base
+  service) to AND a tenant column into every mutation's WHERE; non-matching rows then
+  return `404` (single) or are skipped (bulk). Default behaviour is unchanged.
+  `reorder` is likewise scopable via `beforeReorder`. See
+  [Securing mutations](./docs/lifecycle-hooks.md#securing-mutations-write-side-scoping).
 
 ### Notes
 
