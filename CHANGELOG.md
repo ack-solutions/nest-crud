@@ -74,6 +74,12 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   unwraps `ids`. The documented body is `{ "ids": [...] }` (the old raw-array
   example was incorrect). Covered by a new HTTP reorder test and the Postgres e2e
   suite in `apps/example-app`.
+- **Runtime crash on `@nestjs/swagger@11.4.x`**: the Swagger helper deep-imported
+  `@nestjs/swagger/dist/constants`, which swagger 11 no longer exposes in its
+  `exports` map — Node threw `ERR_PACKAGE_PATH_NOT_EXPORTED` at import time for
+  consumers on that version (it compiled fine because `tsc` ignores `exports`). The
+  helper now inlines the stable metadata keys instead. A new test guards against any
+  `@nestjs/*/dist` or `/lib` deep import being reintroduced.
 
 ### Notes
 
