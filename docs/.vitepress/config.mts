@@ -22,6 +22,7 @@ export default defineConfig({
           { text: 'nest_crud_request (pub.dev)', link: 'https://pub.dev/packages/nest_crud_request' },
         ],
       },
+      { text: 'Migration', link: '/migration' },
       { text: 'Changelog', link: 'https://github.com/ack-solutions/nest-crud/blob/main/CHANGELOG.md' },
     ],
     sidebar: [
@@ -46,6 +47,7 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'Packages & links', link: '/packages' },
+          { text: 'Migration (v1 → v2)', link: '/migration' },
           { text: 'Error handling', link: '/error-handling' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
         ],
