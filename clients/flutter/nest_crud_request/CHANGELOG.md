@@ -1,3 +1,10 @@
+## 2.0.2
+
+- Version aligned with the `@ackplus/nest-crud` 2.0.2 release (server-side: the
+  `counts` endpoint now honours the whole `filter` — `where` and the soft-delete
+  flags). No changes to the Dart query builder itself — all packages release together
+  at one version.
+
 ## 2.0.1
 
 - Version aligned with the `@ackplus/nest-crud` 2.0.1 release (server-side:
