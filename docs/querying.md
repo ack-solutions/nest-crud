@@ -437,6 +437,14 @@ GET /users/get/counts?groupByKey=status
 { "total": 100, "data": [ { "count": 60, "status": "active" }, { "count": 40, "status": "inactive" } ] }
 ```
 
+Counts honour the [soft-delete](#soft-delete) flags too — pass `withDeleted` /
+`onlyDeleted` at the **top level** (like the list endpoints), not inside `filter`:
+
+```
+GET /users/get/counts?onlyDeleted=true                 # how many are in the trash
+GET /users/get/counts?onlyDeleted=true&groupByKey=status
+```
+
 ## Soft delete
 
 When the entity has a `deletedAt` column (it does via `BaseEntity`), deleted rows

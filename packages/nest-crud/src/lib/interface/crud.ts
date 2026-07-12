@@ -123,6 +123,10 @@ export interface IFindOneOptions {
 export interface ICountsRequest {
     filter: IFindManyOptions;
     groupByKey?: string | string[];
+    /** Count the full set including soft-deleted rows (top-level, like findMany). */
+    withDeleted?: boolean;
+    /** Count only soft-deleted rows (top-level, like findMany). */
+    onlyDeleted?: boolean;
     [extraQueryParams: string]: any;
 }
 

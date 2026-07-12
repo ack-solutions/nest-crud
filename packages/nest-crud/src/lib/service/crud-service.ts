@@ -543,6 +543,18 @@ export class CrudService<T extends BaseEntity> {
         const groupByKey = request.groupByKey ?? null;
         // make sure filter becomes a real object even if request has "filter[where]" keys
         const parsedOptions = RequestQueryParser.parse(request?.filter || {});
+
+        // Soft-delete flags travel at the TOP level of the counts request (mirroring
+        // findMany / findAll), not inside `filter` — surface them so counts can target
+        // the deleted / full set instead of always the active set. Top-level wins.
+        const asBool = (v: any) => v === true || v === 'true' || v === '1';
+        if (request?.withDeleted !== undefined) {
+            parsedOptions.withDeleted = asBool(request.withDeleted);
+        }
+        if (request?.onlyDeleted !== undefined) {
+            parsedOptions.onlyDeleted = asBool(request.onlyDeleted);
+        }
+
         sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter

@@ -4,6 +4,19 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`counts` now honours the soft-delete flags.** `GET {resource}/get/counts` ignored
+  `withDeleted` / `onlyDeleted`: the counts DTO rejected the top-level flags under a
+  strict `ValidationPipe` (`forbidNonWhitelisted` → `400`), and `counts()` never
+  surfaced them into the query, so counts always reflected the **active** set even
+  though the list endpoints honoured them. The counts DTO now accepts the flags (it
+  extends the shared `ManyConditionDto`, like `findMany`) and `counts()` applies them
+  from the top level — so `?onlyDeleted=true` / `?withDeleted=true` (optionally with
+  `groupByKey`) count the trashed / full set. Pass them top-level, not inside `filter`.
+
 ## [2.0.1] — 2026-06-13
 
 Patch on the 2.0.0 (v2) line. Makes the documented global-config entrypoint actually
