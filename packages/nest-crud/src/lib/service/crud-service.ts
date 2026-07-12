@@ -541,20 +541,23 @@ export class CrudService<T extends BaseEntity> {
      */
     async counts(request: ICountsRequest, crudOptions?: Partial<CrudOptions>): Promise<ICountsResult> {
         const groupByKey = request.groupByKey ?? null;
-        // make sure filter becomes a real object even if request has "filter[where]" keys
-        const parsedOptions = RequestQueryParser.parse(request?.filter || {});
 
-        // Soft-delete flags travel at the TOP level of the counts request (mirroring
-        // findMany / findAll), not inside `filter` — surface them so counts can target
-        // the deleted / full set instead of always the active set. Top-level wins.
-        const asBool = (v: any) => v === true || v === 'true' || v === '1';
-        if (request?.withDeleted !== undefined) {
-            parsedOptions.withDeleted = asBool(request.withDeleted);
+        // `filter` is the same shape as a findMany query (where / relations / order /
+        // select + the soft-delete flags withDeleted / onlyDeleted). Over HTTP it
+        // arrives as a JSON string — typically the request query builder's output —
+        // or as an object (bracket notation / a direct service call). Normalise a
+        // JSON-string filter to an object first: passing the raw string into
+        // RequestQueryParser would run it through `qs` and silently drop the ENTIRE
+        // filter (that's why counts ignored `where` and the soft-delete flags).
+        let filter: any = request?.filter ?? {};
+        if (typeof filter === 'string') {
+            try {
+                filter = JSON.parse(filter);
+            } catch {
+                throw new BadRequestException('Invalid `filter`: expected a JSON object.');
+            }
         }
-        if (request?.onlyDeleted !== undefined) {
-            parsedOptions.onlyDeleted = asBool(request.onlyDeleted);
-        }
-
+        const parsedOptions = RequestQueryParser.parse(filter);
         sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter

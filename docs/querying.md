@@ -422,10 +422,13 @@ GET /users?take=20&skip=40
 ## Counts
 
 `GET /resource/get/counts` returns the number of matching rows. Pass a `filter`
-(same shape as `where`) and an optional `groupByKey`.
+and an optional `groupByKey`. The `filter` is a **whole findMany query** (the same
+thing the [client query builder](#client-query-builder) produces) as a JSON string —
+`where`, `relations`, `order`, and the [soft-delete](#soft-delete) flags all live
+**inside** it. There are no separate root query params.
 
 ```
-GET /users/get/counts?filter={"isActive":true}
+GET /users/get/counts?filter={"where":{"isActive":true}}
 ```
 ```json
 { "total": 42 }
@@ -437,13 +440,15 @@ GET /users/get/counts?groupByKey=status
 { "total": 100, "data": [ { "count": 60, "status": "active" }, { "count": 40, "status": "inactive" } ] }
 ```
 
-Counts honour the [soft-delete](#soft-delete) flags too — pass `withDeleted` /
-`onlyDeleted` at the **top level** (like the list endpoints), not inside `filter`:
+Soft-delete counts — put `withDeleted` / `onlyDeleted` in the `filter` too:
 
 ```
-GET /users/get/counts?onlyDeleted=true                 # how many are in the trash
-GET /users/get/counts?onlyDeleted=true&groupByKey=status
+GET /users/get/counts?filter={"onlyDeleted":true}                    # how many are in the trash
+GET /users/get/counts?filter={"onlyDeleted":true}&groupByKey=status
 ```
+
+With the client builder that's just `new RequestQueryBuilder().setOnlyDeleted(true)`
+(plus any `where`) passed straight through as the `filter`.
 
 ## Soft delete
 

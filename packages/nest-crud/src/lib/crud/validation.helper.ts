@@ -265,16 +265,13 @@ export class Validation {
             const groupCol = countCols[0] ?? 'status';
             const filterEx = JSON.stringify({ where: { [groupCol]: 'value' } });
 
-            // Extends ManyConditionDto so the top-level soft-delete flags
-            // (`withDeleted` / `onlyDeleted`) are whitelisted and coerced — otherwise a
-            // strict global ValidationPipe (`forbidNonWhitelisted`) rejects them, and
-            // counts could never target the deleted set. Mirrors FindManyImpl.
-            class CountsImpl extends ManyConditionDto {
+            class CountsImpl {
                 @ApiPropertyOptional({
                     type: String,
-                    description: `Filter as a **JSON string** — the same shape as a findMany query (\`where\`, \`relations\`, …). ${docsLink('query-operators')}`,
+                    description: `Filter as a **JSON string** — the same shape as a findMany query (\`where\`, \`relations\`, \`order\`, and the soft-delete flags \`withDeleted\` / \`onlyDeleted\`). ${docsLink('query-operators')}`,
                     examples: {
                         where: { summary: 'Filter by where', value: filterEx },
+                        onlyDeleted: { summary: 'Count only trashed rows', value: JSON.stringify({ onlyDeleted: true }) },
                     },
                 })
                 @IsOptional()

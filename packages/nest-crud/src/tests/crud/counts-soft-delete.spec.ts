@@ -6,18 +6,21 @@ import { createCrudTestingModule } from '../helper/testing-module';
 import { User } from '../helper/entities/user-test.entity';
 
 /**
- * The counts endpoint (`GET {resource}/get/counts`) must honour the soft-delete
- * flags like the list endpoints do. The counts request goes through a STRICT
- * ValidationPipe (`whitelist` + `forbidNonWhitelisted` + `transform`) to mirror a
- * real app — exactly the setup under which the bug showed:
- *   - before: top-level `onlyDeleted`/`withDeleted` were rejected `400` by the
- *     counts DTO, and even when they slipped through, `counts()` ignored them
- *     (always the active set).
+ * The counts endpoint (`GET {resource}/get/counts`) takes a `filter` that is the
+ * same shape as a findMany query (the request query builder's output): `where`,
+ * `relations`, `order`, and the soft-delete flags `withDeleted` / `onlyDeleted`.
+ * Everything in `filter` must be honoured — no separate root query params.
  *
- * Rows are seeded via the repository so the strict pipe only gates the endpoint
- * under test (the generated create DTO isn't the subject here).
+ * Before the fix, `counts()` ran a JSON-string `filter` through `qs` instead of
+ * `JSON.parse`, so the ENTIRE filter was dropped: `where` was ignored AND the
+ * soft-delete flags were ignored (counts always returned the active set).
+ *
+ * Uses a STRICT ValidationPipe (`whitelist` + `forbidNonWhitelisted` + `transform`)
+ * to mirror a real app, and seeds via the repository so the pipe only gates the
+ * endpoint under test. `filter` is sent as a JSON string, exactly as the client
+ * query builder's `toJson()` serialises it.
  */
-describe('counts endpoint honours soft-delete flags', () => {
+describe('counts endpoint honours the filter (nested where + soft-delete)', () => {
     let app: INestApplication;
     let dataSource: DataSource;
     let repo: Repository<User>;
@@ -45,37 +48,58 @@ describe('counts endpoint honours soft-delete flags', () => {
     });
 
     const http = () => request(app.getHttpServer());
-    const counts = (q: Record<string, any> = {}) => http().get('/users/get/counts').query(q);
+    // `filter` sent as a JSON string, like the query builder's toJson() output.
+    const counts = (filter?: Record<string, any>, extra: Record<string, any> = {}) =>
+        http().get('/users/get/counts').query({
+            ...(filter !== undefined ? { filter: JSON.stringify(filter) } : {}),
+            ...extra,
+        });
 
-    // 2 active + 1 soft-deleted
+    // 2 active (a, b) + 1 soft-deleted (c)
     async function seed() {
         await repo.save(repo.create([{ name: 'a' }, { name: 'b' }]));
         const c = await repo.save(repo.create({ name: 'c' }));
         await repo.softDelete(c.id);
     }
 
-    it('default: counts only the active set', async () => {
+    it('no filter: counts only the active set', async () => {
         await seed();
         expect((await counts().expect(200)).body.total).toBe(2);
     });
 
-    it('?onlyDeleted=true: accepted (not 400) and counts only the deleted set', async () => {
+    it('filter { onlyDeleted: true }: counts only the deleted set', async () => {
         await seed();
-        expect((await counts({ onlyDeleted: 'true' }).expect(200)).body.total).toBe(1);
+        expect((await counts({ onlyDeleted: true }).expect(200)).body.total).toBe(1);
     });
 
-    it('?withDeleted=true: counts the full set (active + deleted)', async () => {
+    it('filter { withDeleted: true }: counts the full set (active + deleted)', async () => {
         await seed();
-        expect((await counts({ withDeleted: 'true' }).expect(200)).body.total).toBe(3);
+        expect((await counts({ withDeleted: true }).expect(200)).body.total).toBe(3);
     });
 
-    it('groupByKey + onlyDeleted: grouped counts over the deleted set only', async () => {
+    it('filter { where }: counts only matching rows (where was dropped before too)', async () => {
+        await seed();
+        expect((await counts({ where: { name: 'a' } }).expect(200)).body.total).toBe(1);
+    });
+
+    it('filter { where + onlyDeleted }: both apply together', async () => {
+        await repo.save(repo.create({ name: 'gone' })); // active, wrong deleted-state
+        const gone = await repo.save(repo.create([{ name: 'gone' }, { name: 'gone' }]));
+        await repo.softDelete(gone.map((u) => u.id));
+        // deleted rows named 'gone' → 2 (the active 'gone' is excluded by onlyDeleted)
+        expect((await counts({ onlyDeleted: true, where: { name: 'gone' } }).expect(200)).body.total).toBe(2);
+    });
+
+    it('groupByKey + filter { onlyDeleted }: grouped over the deleted set only', async () => {
         await repo.save(repo.create({ name: 'keep' })); // active, excluded
         const gone = await repo.save(repo.create([{ name: 'gone' }, { name: 'gone' }]));
         await repo.softDelete(gone.map((u) => u.id));
-
-        const res = await counts({ onlyDeleted: 'true', groupByKey: 'name' }).expect(200);
+        const res = await counts({ onlyDeleted: true }, { groupByKey: 'name' }).expect(200);
         expect(res.body.total).toBe(2);
         expect(res.body.data).toEqual([{ name: 'gone', count: 2 }]);
+    });
+
+    it('malformed filter JSON → 400', async () => {
+        await http().get('/users/get/counts').query({ filter: '{not json' }).expect(400);
     });
 });
