@@ -4,6 +4,21 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`counts` now honours the whole `filter`** — fixes both `where` and the
+  soft-delete flags. `GET {resource}/get/counts` ran a JSON-string `filter` through
+  `qs` instead of `JSON.parse`, so the **entire** filter was silently dropped:
+  `where` was ignored and `withDeleted` / `onlyDeleted` never applied (counts always
+  returned the active set). `counts()` now normalises the filter to an object first,
+  so everything the [request query builder](./packages.md) puts in it is honoured —
+  e.g. `?filter={"onlyDeleted":true}` or `?filter={"where":{…},"onlyDeleted":true}`
+  (optionally with `groupByKey`). The soft-delete flags live **inside** `filter` (its
+  `IFindManyOptions` shape already carries them) — no separate root query params. A
+  malformed `filter` JSON now returns `400`.
+
 ## [2.0.1] — 2026-06-13
 
 Patch on the 2.0.0 (v2) line. Makes the documented global-config entrypoint actually

@@ -268,9 +268,10 @@ export class Validation {
             class CountsImpl {
                 @ApiPropertyOptional({
                     type: String,
-                    description: `Filter as a **JSON string** — the same shape as a findMany query (\`where\`, \`relations\`, …). ${docsLink('query-operators')}`,
+                    description: `Filter as a **JSON string** — the same shape as a findMany query (\`where\`, \`relations\`, \`order\`, and the soft-delete flags \`withDeleted\` / \`onlyDeleted\`). ${docsLink('query-operators')}`,
                     examples: {
                         where: { summary: 'Filter by where', value: filterEx },
+                        onlyDeleted: { summary: 'Count only trashed rows', value: JSON.stringify({ onlyDeleted: true }) },
                     },
                 })
                 @IsOptional()

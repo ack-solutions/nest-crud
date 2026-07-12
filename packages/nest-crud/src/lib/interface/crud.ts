@@ -121,6 +121,11 @@ export interface IFindOneOptions {
 }
 
 export interface ICountsRequest {
+    /**
+     * Same shape as a findMany query — `where`, `relations`, `order`, `select`,
+     * and the soft-delete flags `withDeleted` / `onlyDeleted`. Build it with the
+     * request query builder; everything in it is honoured by the count.
+     */
     filter: IFindManyOptions;
     groupByKey?: string | string[];
     [extraQueryParams: string]: any;
