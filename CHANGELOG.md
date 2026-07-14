@@ -4,6 +4,19 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Bulk delete now accepts a single id.** `deleteMany` (`DELETE /delete/bulk`) and
+  `deleteFromTrashMany` (`DELETE /trash/bulk`) read `ids` from the query and validated
+  with `@IsArray()`. Over HTTP a one-element array serialises to a scalar (`?ids=x`) —
+  Express only builds an array from repeated keys — so deleting exactly one row via the
+  bulk route failed with `400 "ids must be an array"` (two+ ids worked). The delete DTO
+  now coerces a scalar to a one-element array, and the service normalises `ids`
+  defensively, so `?ids=x` works like `?ids=a&ids=b`. (`restoreMany` reads ids from the
+  body and was unaffected.)
+
 ## [2.0.2] — 2026-06-13
 
 Patch on the 2.x line. All packages release together at this version.

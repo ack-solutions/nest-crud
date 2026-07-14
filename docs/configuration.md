@@ -64,6 +64,10 @@ The route names are: `findMany`, `findAll`, `counts`, `findOne`, `create`,
 
 † only generated when `softDelete: true`.
 
+The query-based bulk routes take **one or many** ids: `?ids=a&ids=b` for several,
+or just `?ids=a` for a single row (a lone id is accepted and treated as a
+one-element list). `restoreMany` takes its ids in the body (`{ "ids": [...] }`).
+
 ## Hiding sensitive fields
 
 `hiddenFields` (and the `@CrudHidden()` entity decorator) remove columns or
