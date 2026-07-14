@@ -4,7 +4,9 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.3] — 2026-07-14
+
+Patch on the 2.x line. All packages release together at this version.
 
 ### Fixed
 
