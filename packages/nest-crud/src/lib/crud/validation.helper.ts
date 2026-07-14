@@ -615,6 +615,12 @@ export class Validation {
                     type: [String]
                 })
                 @IsOptional()
+                // Coerce a scalar to a one-element array. `ids` is read from the query,
+                // and over HTTP a single-element array serialises to a scalar (`?ids=x`)
+                // — the Express-5 "simple" parser only makes an array from repeated keys.
+                // Without this, deleting exactly one row via the bulk route fails
+                // `@IsArray()` with 400. Two+ ids (`?ids=a&ids=b`) already parse as an array.
+                @Transform(({ value }) => (value === undefined ? value : Array.isArray(value) ? value : [value]))
                 @IsArray()
                 ids?: string[];
 

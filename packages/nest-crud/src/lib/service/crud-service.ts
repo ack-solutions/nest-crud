@@ -775,13 +775,14 @@ export class CrudService<T extends BaseEntity> {
      * - Output: `{ message: string }`
      */
     async deleteMany(params: IDeleteManyOptions, softDelete?: boolean, ..._others: any) {
-        if (!params.ids || params.ids.length === 0) {
+        const idList = this.toIdList(params?.ids as any);
+        if (idList.length === 0) {
             return {
                 success: true,
                 message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
-        const ids = await this.beforeDeleteMany(params.ids);
+        const ids = await this.beforeDeleteMany(idList as any);
         if (ids?.length > 0) {
             const where = await this.resolveMutateWhere(
                 { id: In(ids) } as FindOptionsWhere<T>,
@@ -842,13 +843,14 @@ export class CrudService<T extends BaseEntity> {
      * - Output: `{ success: true, message: string }`
      */
     async deleteFromTrashMany(params: IDeleteManyOptions, ..._others: any[]) {
-        if (!params.ids || params.ids.length === 0) {
+        const idList = this.toIdList(params?.ids as any);
+        if (idList.length === 0) {
             return {
                 success: true,
                 message: this.msg('noItemsToDelete', 'No items to delete'),
             };
         }
-        const ids = await this.beforeDeleteFromTrashMany(params.ids);
+        const ids = await this.beforeDeleteFromTrashMany(idList as any);
         if (ids?.length > 0) {
             const where = await this.resolveMutateWhere(
                 { id: In(ids) } as FindOptionsWhere<T>,
@@ -983,6 +985,16 @@ export class CrudService<T extends BaseEntity> {
         action: CrudActionsEnum,
     ): Promise<FindOptionsWhere<T>> {
         return this.beforeMutate(this.parseFindOptions(criteria), action);
+    }
+
+    /**
+     * Normalise a bulk `ids` input to an array. Over HTTP a one-element array
+     * serialises to a scalar (`?ids=x`), so `params.ids` can arrive as a single id
+     * rather than an array — accept both (and treat missing as empty).
+     */
+    protected toIdList(ids: ID | ID[] | undefined | null): ID[] {
+        if (ids === undefined || ids === null) return [];
+        return Array.isArray(ids) ? ids : [ids];
     }
 
 }
