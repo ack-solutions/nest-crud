@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { ObjectLiteral, Repository } from 'typeorm';
+import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 
 import { IFindManyOptions } from '../interface/crud';
 import { OrderDirectionEnum, RelationObject, RelationObjectValue, RelationOptions, WhereOptions } from '../types';
@@ -35,7 +35,16 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
         return !!options && Array.isArray(options.aggregates) && options.aggregates.length > 0;
     }
 
-    async getManyAndCount(options: IFindManyOptions): Promise<{ items: T[]; total: number }> {
+    /**
+     * @param scopeInner Applied to the Phase-1 root query — the same
+     * `beforeFindMany` scoping the non-aggregate path uses, so tenant/visibility
+     * guards are enforced here too. It must mutate the passed query builder (the
+     * standard `andWhere(...)` pattern); its return value isn't swapped in.
+     */
+    async getManyAndCount(
+        options: IFindManyOptions,
+        scopeInner?: (qb: SelectQueryBuilder<T>) => Promise<SelectQueryBuilder<T>> | SelectQueryBuilder<T>,
+    ): Promise<{ items: T[]; total: number }> {
         const meta = this.repository.metadata;
         const pkProp = meta.primaryColumns[0].propertyName;
         const pkDb = meta.primaryColumns[0].databaseName;
@@ -62,6 +71,14 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
         }
         if (options.where) {
             new WhereQueryBuilder(helper).build(options.where);
+        }
+
+        // Apply the same row-scoping the non-aggregate path applies via
+        // `beforeFindMany` (tenant / visibility guards). Runs on the Phase-1 root
+        // query so its constraints filter which rows (and thus which aggregates)
+        // survive — mutating the builder in place, the standard hook pattern.
+        if (scopeInner) {
+            await scopeInner(inner);
         }
 
         // SELECT pk
@@ -112,8 +129,10 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
         }
 
         // Collapse any join fan-out; scalar subqueries and root columns stay valid
-        // under GROUP BY the primary key on all three engines.
-        if (joined) {
+        // under GROUP BY the primary key on all three engines. Also group when a
+        // scope hook ran, since it may have added a joined constraint that would
+        // otherwise multiply pk rows and inflate `total`.
+        if (joined || scopeInner) {
             inner.groupBy(`${q(inner.alias)}.${q(pkDb)}`);
         }
 
