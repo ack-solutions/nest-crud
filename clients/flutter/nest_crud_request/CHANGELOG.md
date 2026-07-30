@@ -1,3 +1,10 @@
+## 2.1.0
+
+- Version aligned with the `@ackplus/nest-crud` 2.1.0 release (server-side: the
+  aggregate path now applies `beforeFindMany`, plus a new `allowSoftDeleteFilter`
+  hook). No changes to the Dart query builder itself — all packages release together
+  at one version.
+
 ## 2.0.3
 
 - Version aligned with the `@ackplus/nest-crud` 2.0.3 release (server-side: bulk

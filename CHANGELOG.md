@@ -4,7 +4,10 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.1.0] — 2026-07-30
+
+Minor on the 2.x line — adds the `allowSoftDeleteFilter` hook and closes a read-path
+scoping gap. All packages release together at this version.
 
 ### Security
 
@@ -115,11 +118,14 @@ mutations. All packages (`@ackplus/nest-crud`, `@ackplus/nest-crud-request`,
 
 ---
 
-## [2.1.0] — unreleased (v2 track)
+## v2 track — advanced querying (aggregates, HAVING, operators, extensibility)
 
-**Additive and non-breaking** over `2.0.0` — no code changes required to upgrade.
-Advanced querying: per-row aggregates, `having`, more operators, and extension
-points. See [Querying → Aggregates](./docs/querying.md#aggregates).
+> Historical: this section and the two below pre-date the tag-driven release flow
+> and describe what shipped **cumulatively on the way to 2.0.0** — the registries
+> went 1.2.x → 1.3.0 → 2.0.0, so these were never separate published versions.
+
+**Additive** — per-row aggregates, `having`, more operators, and extension points.
+See [Querying → Aggregates](./docs/querying.md#aggregates).
 
 ### Added
 
@@ -192,11 +198,9 @@ points. See [Querying → Aggregates](./docs/querying.md#aggregates).
   root columns; an unknown key returns `400` (the non-aggregate path is unchanged).
 - Aggregates cover single-level relations; many-to-many is not yet supported.
 
----
+## v2 track — response unification & removals (breaking)
 
-## [2.0.0] — unreleased (v2 track)
-
-Breaking — see [MIGRATION.md](./MIGRATION.md). Includes everything below plus:
+See [MIGRATION.md](./MIGRATION.md). Includes everything below plus:
 
 ### Added
 
@@ -215,7 +219,7 @@ Breaking — see [MIGRATION.md](./MIGRATION.md). Includes everything below plus:
 
 ---
 
-## [1.2.0] — unreleased (v1.x track)
+## v1.2 track — hardening, tests & docs
 
 A non-breaking hardening, testing, and documentation release. Existing apps
 upgrade with no code changes.
