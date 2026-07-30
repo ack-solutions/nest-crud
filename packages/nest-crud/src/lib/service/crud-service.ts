@@ -160,6 +160,37 @@ export class CrudService<T extends BaseEntity> {
     }
 
     /**
+     * Decide whether the client may use the soft-delete query flags
+     * (`withDeleted` / `onlyDeleted`) on a read. These flags are query *capabilities*,
+     * not an authorization boundary — anyone can append `?withDeleted=true` unless you
+     * gate it. Return `false` to force them off: the read then sees only live rows no
+     * matter what the client sent (applies to `findMany` / `findAll` / `counts`, and
+     * the aggregate path). Override to restrict the trash to privileged callers:
+     *
+     * ```ts
+     * protected async allowSoftDeleteFilter() {
+     *   return this.ctx.isManager; // members never see soft-deleted rows
+     * }
+     * ```
+     *
+     * Default: allowed (unchanged behaviour).
+     */
+    protected async allowSoftDeleteFilter(_request?: any): Promise<boolean> {
+        return true;
+    }
+
+    /**
+     * Force the soft-delete flags off when {@link allowSoftDeleteFilter} denies them,
+     * so a client can't read trashed rows via `?withDeleted` / `?onlyDeleted`.
+     */
+    private async applySoftDeleteAccess(parsed: IFindManyOptions, request?: any): Promise<void> {
+        if ((parsed.withDeleted || parsed.onlyDeleted) && !(await this.allowSoftDeleteFilter(request))) {
+            parsed.withDeleted = false;
+            parsed.onlyDeleted = false;
+        }
+    }
+
+    /**
      * Hook that runs before `delete()`.
      *
      * Use this to:
@@ -463,12 +494,18 @@ export class CrudService<T extends BaseEntity> {
          * - `{ items: T[]; total: number }`
          */
         const parsedOptions = RequestQueryParser.parse(query || {});
+        await this.applySoftDeleteAccess(parsedOptions, query);
         applyListPagination(parsedOptions, crudOptions);
 
         // Aggregate path: user-defined count/sum/avg/min/max over relations, with
         // optional HAVING/order on the aggregate aliases (two-phase derived table).
+        // Runs the SAME `beforeFindMany` scoping as the normal path so tenant /
+        // visibility guards are enforced here too.
         if (AggregateQueryBuilder.has(parsedOptions)) {
-            return this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+            return this.createAggregateQueryBuilder().getManyAndCount(
+                parsedOptions,
+                (qb) => this.beforeFindMany(qb, query),
+            );
         }
 
         let queryBuilder = this.createFindQueryBuilder();
@@ -495,10 +532,14 @@ export class CrudService<T extends BaseEntity> {
   */
     async findAll(query: IFindManyOptions, crudOptions?: Partial<CrudOptions>, ..._others: any[]): Promise<FindAllResponse<T>> {
         const parsedOptions = RequestQueryParser.parse(query || {});
+        await this.applySoftDeleteAccess(parsedOptions, query);
         applyNoPaginationLimit(parsedOptions, crudOptions);
 
         if (AggregateQueryBuilder.has(parsedOptions)) {
-            const { items } = await this.createAggregateQueryBuilder().getManyAndCount(parsedOptions);
+            const { items } = await this.createAggregateQueryBuilder().getManyAndCount(
+                parsedOptions,
+                (qb) => this.beforeFindMany(qb, query),
+            );
             return items;
         }
 
@@ -520,8 +561,9 @@ export class CrudService<T extends BaseEntity> {
 
     /**
      * Factory for the aggregate (two-phase) query builder. Override to customise the
-     * aggregate execution. Note: `beforeFindMany` is not applied on the aggregate
-     * path — override this instead.
+     * aggregate execution. `beforeFindMany` IS applied on this path too (its scoping
+     * runs on the Phase-1 root query), so tenant/visibility guards hold for
+     * aggregate requests as well.
      */
     protected createAggregateQueryBuilder(): AggregateQueryBuilder<T> {
         return new AggregateQueryBuilder(this.repository);
@@ -558,6 +600,7 @@ export class CrudService<T extends BaseEntity> {
             }
         }
         const parsedOptions = RequestQueryParser.parse(filter);
+        await this.applySoftDeleteAccess(parsedOptions, request);
         sanitizeCountsFilter(parsedOptions, crudOptions);
 
         // Parse filter if it's a raw query parameter

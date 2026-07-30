@@ -85,10 +85,32 @@ export class DocumentService extends CrudService<Document> {
   The library manages the select list (columns, relations, hidden-field stripping);
   overriding it breaks nested hydration. Use `andWhere`, `leftJoin`, `addOrderBy`,
   `setParameter` instead.
-- **The aggregate path is separate.** When a request uses
-  [`aggregates`](./querying.md#aggregates), `findMany` runs a two-phase query and
-  `beforeFindMany` is **not** applied to it. To scope that path, override
-  `createAggregateQueryBuilder()` (see below).
+- **The aggregate path is covered.** When a request uses
+  [`aggregates`](./querying.md#aggregates), `findMany` runs a two-phase query — and
+  `beforeFindMany` **is** applied to it (its constraints run on the query that picks
+  the rows), so your tenant/visibility scoping holds for aggregate requests too. For
+  changes beyond `andWhere`-style scoping, override `createAggregateQueryBuilder()`.
+
+## Gating the soft-delete flags
+
+`withDeleted` / `onlyDeleted` are query **capabilities**, not authorization — any
+caller can append `?withDeleted=true` and read trashed rows unless you stop them.
+Override `allowSoftDeleteFilter()` to refuse them (e.g. only managers see the trash);
+return `false` and the flags are forced off for that request across `findMany` /
+`findAll` / `counts` (and the aggregate path), so the read sees only live rows:
+
+```ts
+@Injectable()
+export class PollService extends CrudService<Poll> {
+  // members never see soft-deleted rows, whatever the query string says
+  protected async allowSoftDeleteFilter() {
+    return this.ctx.isManager;
+  }
+}
+```
+
+(Or enforce it in `beforeFindMany` with an explicit `deletedAt IS NULL` — the hook is
+just the declarative shortcut.)
 
 ## Securing mutations (write-side scoping)
 

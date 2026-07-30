@@ -4,6 +4,27 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+
+- **The aggregate path no longer bypasses `beforeFindMany`.** A list request carrying
+  a non-empty `aggregates` array short-circuited into the two-phase aggregate builder,
+  which skipped `beforeFindMany` — so every tenant/visibility guard riding on that hook
+  was bypassed for aggregate queries (e.g. `GET /polls?aggregates=[…]` could return
+  other tenants' rows). `beforeFindMany` is now applied to the aggregate path's
+  row-selection query, so the same scoping holds. (Reachable once a guarded entity
+  declares a relation; caught before it went live.)
+
+### Added
+
+- **`allowSoftDeleteFilter(request)` hook** — gate the client soft-delete flags.
+  `withDeleted` / `onlyDeleted` are query capabilities, not authorization; return
+  `false` from this hook and they are forced off for the request (across `findMany` /
+  `findAll` / `counts` and the aggregate path), so a caller can't read trashed rows via
+  `?withDeleted=true`. Default is allowed (unchanged). See
+  [Gating the soft-delete flags](./docs/lifecycle-hooks.md#gating-the-soft-delete-flags).
+
 ## [2.0.3] — 2026-07-14
 
 Patch on the 2.x line. All packages release together at this version.
