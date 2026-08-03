@@ -4,6 +4,16 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`allowSoftDeleteFilter` now also gates `findOne`.** The hook (added in 2.1.0)
+  covered `findMany` / `findAll` / `counts` and the aggregate path, but `findOne`
+  built its query without it — so a denied caller could still fetch a single trashed
+  row by id via `GET /:id?withDeleted=true`. `findOne` now applies the same gate, so
+  the hook covers **every** read.
+
 ## [2.1.0] — 2026-07-30
 
 Minor on the 2.x line — adds the `allowSoftDeleteFilter` hook and closes a read-path

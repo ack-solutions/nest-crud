@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, NotFoundException } from '@nestjs/common';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 
 import { createCrudTestApp } from '../helper/testing-module';
@@ -63,9 +63,11 @@ describe('Read-path security hooks', () => {
     });
 
     describe('allowSoftDeleteFilter gates the soft-delete flags', () => {
+        let janeId: string;
         beforeEach(async () => {
             const jane = await repo.findOne({ where: { name: 'Jane Smith' } });
-            await repo.softDelete(jane!.id); // trash Jane
+            janeId = jane!.id;
+            await repo.softDelete(janeId); // trash Jane
         });
 
         it('control: an unscoped service honours ?withDeleted=true (sees the trashed row)', async () => {
@@ -87,6 +89,17 @@ describe('Read-path security hooks', () => {
         it('denied: counts also ignores the client soft-delete flag', async () => {
             const { total } = await new NoTrashService(repo).counts({ filter: { withDeleted: true } });
             expect(total).toBe(1); // only the live row is counted
+        });
+
+        it('control: an unscoped findOne honours ?withDeleted=true (fetches the trashed row)', async () => {
+            const found = await new CrudService<User>(repo).findOne(janeId, { withDeleted: true } as any);
+            expect(found.name).toBe('Jane Smith');
+        });
+
+        it('denied: findOne is gated too — a trashed row is not fetchable via withDeleted', async () => {
+            await expect(
+                new NoTrashService(repo).findOne(janeId, { withDeleted: true } as any),
+            ).rejects.toThrow(NotFoundException);
         });
     });
 });
