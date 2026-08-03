@@ -96,8 +96,9 @@ export class DocumentService extends CrudService<Document> {
 `withDeleted` / `onlyDeleted` are query **capabilities**, not authorization — any
 caller can append `?withDeleted=true` and read trashed rows unless you stop them.
 Override `allowSoftDeleteFilter()` to refuse them (e.g. only managers see the trash);
-return `false` and the flags are forced off for that request across `findMany` /
-`findAll` / `counts` (and the aggregate path), so the read sees only live rows:
+return `false` and the flags are forced off for that request across **every read**
+— `findMany` / `findAll` / `findOne` / `counts`, including the aggregate path — so
+the read sees only live rows:
 
 ```ts
 @Injectable()

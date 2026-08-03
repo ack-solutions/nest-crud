@@ -665,6 +665,10 @@ export class CrudService<T extends BaseEntity> {
     async findOne(id: ID, query: IFindOneOptions = {}, ..._others: any[]): Promise<T> {
         // Parse query parameters for joins
         const parsedOptions = RequestQueryParser.parse(query || {});
+        // Gate the client soft-delete flags here too, so `allowSoftDeleteFilter`
+        // covers EVERY read (findOne can otherwise fetch a trashed row by id via
+        // `?withDeleted=true`).
+        await this.applySoftDeleteAccess(parsedOptions, { id, ...query });
 
         const queryBuilder = new FindQueryBuilder(this.repository);
 
