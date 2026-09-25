@@ -96,6 +96,18 @@ export enum CrudActionsEnum {
     REORDER = 'reorder',
 }
 
+/**
+ * Passed to `beforeSave` as its third argument so the hook knows what it is
+ * saving: which action runs, and — for `update` / `updateMany` — the stored row
+ * as loaded before the change (useful to merge a partial body or enforce
+ * rules like "locked after confirm" without loading the row again).
+ */
+export interface CrudSaveContext<T = any> {
+    action: CrudActionsEnum;
+    /** The stored row (update / updateMany only). */
+    oldData?: T;
+}
+
 
 export interface IFindManyOptions {
     relations?: RelationOptions;

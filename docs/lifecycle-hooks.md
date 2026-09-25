@@ -44,6 +44,48 @@ export class UserService extends CrudService<User> {
 | `beforeDeleteFromTrash` / `afterDeleteFromTrash` | `deleteFromTrash` |
 | `beforeDeleteFromTrashMany` / `afterDeleteFromTrashMany` | `deleteFromTrashMany` |
 
+### What the write hooks receive
+
+The body is sanitized **before** any hook runs, so hooks work on a trustworthy
+payload — and anything a hook sets (including the fields below) is kept:
+
+- **Create always inserts.** `create` / `createMany` drop the generated primary key
+  and the create / update / delete date and version columns from the row and,
+  recursively, from its owned child rows (one-to-many arrays, inverse one-to-one
+  objects). So a `POST` carrying an existing row's `id` inserts a new row instead of
+  overwriting that one, and a child sent with an `id` is inserted fresh rather than
+  moved under the new parent. **References keep their ids** — many-to-one objects,
+  `...Id` columns and many-to-many links still point at existing rows.
+- **Updates know their row.** `update` / `updateMany` set the primary key on the
+  body to the stored row's (a body `id` naming another row is replaced) and drop
+  the date / version columns (so a client can't backdate a row, or soft-delete it
+  through `PUT`).
+
+`beforeSave` gets a third argument describing the save, including the stored row
+on updates — handy for merging a partial body or locking a row after a status
+change without loading it again:
+
+```ts
+protected async beforeSave(data: Partial<Invoice>, _req?: any, ctx?: CrudSaveContext<Invoice>) {
+  if (ctx?.oldData?.status === 'confirmed') {
+    throw new BadRequestException('Confirmed invoices are locked');
+  }
+  return data;
+}
+```
+
+`ctx.action` is `create` / `createMany` / `update` / `updateMany`; `ctx.oldData` is
+set for the two update actions.
+
+::: warning Upgrading from ≤ 2.1
+If you pre-saved child rows yourself and then passed them (with their ids) into
+`create()`, those ids are now dropped and the children would be inserted twice —
+let the cascade save them instead. If clients must supply their own ids (e.g.
+offline-generated UUIDs), override `prepareCreateData(data)` to return `data`
+unchanged, and guard against overwrites yourself. For your own non-CRUD create
+paths, reuse the same rule with the exported `stripServerManagedFields(metadata, body)`.
+:::
+
 ## Read hooks — **must return the query builder**
 
 `beforeFindMany`, `beforeFindOne`, and `beforeCounts` receive the TypeORM
@@ -122,9 +164,10 @@ To make mutations safe by default, scope the **criteria** itself with `beforeMut
 ### `beforeMutate(criteria, action)` — the write-side counterpart to read scoping
 
 It runs for every mutation-by-id — `update`, `delete`, `deleteFromTrash`, `restore`,
-and their bulk variants — and whatever criteria you return is what **loads and
-mutates** the row(s). A row that doesn't match becomes invisible: single-row
-mutations return `404`; bulk variants silently skip it.
+their bulk variants, and each per-row write of `reorder` — and whatever criteria you
+return is what **loads and mutates** the row(s). A row that doesn't match becomes
+invisible: single-row mutations return `404`; bulk variants and `reorder` silently
+skip it.
 
 ```ts
 @Injectable()
@@ -143,16 +186,19 @@ export class DocumentService extends CrudService<Document> {
 }
 ```
 
-For single-row calls `criteria` is `{ id }`; for bulk it's `{ id: In(ids) }`. Use the
+For single-row calls (and each reorder write) `criteria` is `{ id }`; for bulk it's
+`{ id: In(ids) }`. Use the
 `action` argument (a `CrudActionsEnum`) if you need to vary the rule per operation.
 The criteria is column-level (TypeORM's `delete`/`update`/`restore` WHERE) — use
 plain columns, not relation joins.
 
 ### `reorder` — `beforeReorder` + a configurable `reorderColumn`
 
-`reorder` writes positions per id, so it can't be scoped by a WHERE. Instead, narrow
-the id list in `beforeReorder` (e.g. to ids the caller owns), and point
-`reorderColumn` at your entity's sort column (it defaults to `order`):
+Each `reorder` write goes through `beforeMutate` like every other mutation, so a
+tenant scope there already keeps it inside the tenant (foreign ids are skipped).
+Optionally drop foreign ids up front in `beforeReorder` so the positions written
+stay contiguous (0, 1, 2…), and point `reorderColumn` at your entity's sort column
+(it defaults to `order`):
 
 ```ts
 @Injectable()
@@ -198,8 +244,8 @@ export abstract class TenantCrudService<T extends BaseEntity> extends CrudServic
 | Hook | Scopes |
 | --- | --- |
 | `beforeFindMany` / `beforeFindOne` / `beforeCounts` | reads (return the query builder) |
-| `beforeMutate` | `update` / `delete` / `deleteFromTrash` / `restore` + bulk |
-| `beforeReorder` (+ `reorderColumn`) | `reorder` |
+| `beforeMutate` | `update` / `delete` / `deleteFromTrash` / `restore` + bulk, and `reorder` |
+| `beforeReorder` (+ `reorderColumn`) | `reorder` id list / column |
 
 ## Extending the query builder
 

@@ -6,9 +6,10 @@ import type { DeepPartial } from 'typeorm';
 import { BaseEntity } from '../base-entity';
 import { AggregateQueryBuilder } from '../helper/aggregate-query-builder';
 import { FindQueryBuilder } from '../helper/find-query-builder';
+import { stripAuditFields, stripServerManagedFields } from '../helper/new-row';
 import { applyListPagination, applyNoPaginationLimit, sanitizeCountsFilter } from '../helper/pagination-limit';
 import { RequestQueryParser } from '../helper/request-query-parser';
-import { CrudActionsEnum, CrudMessages, CrudOptions, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
+import { CrudActionsEnum, CrudMessages, CrudOptions, CrudSaveContext, ICountsRequest, ICountsResult, IDeleteManyOptions, IFindManyOptions, IFindOneOptions, FindAllResponse, PaginationResponse } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 import { CrudConfigService } from './crud-config.service';
 
@@ -48,12 +49,53 @@ export class CrudService<T extends BaseEntity> {
      * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
      * - Remove/override unsafe values before saving
      *
+     * The payload is already sanitized when this runs (see `prepareCreateData` /
+     * `prepareUpdateData`): on create it has no generated id or audit columns; on
+     * update its primary key is the stored row's, whatever the body said. Anything
+     * you set here (including those fields) is kept.
+     *
      * @param entity Partial entity payload that will be saved.
      * @param _request Optional original request context (controller can pass anything).
+     * @param _context What is being saved: the action and, for `update` /
+     *   `updateMany`, the stored row (`oldData`) — so a hook can merge a partial body.
      * @returns The final entity payload that will be passed into TypeORM save/update.
      */
-    protected async beforeSave(entity: Partial<T>, _request?: any): Promise<Partial<T>> {
+    protected async beforeSave(entity: Partial<T>, _request?: any, _context?: CrudSaveContext<T>): Promise<Partial<T>> {
         return entity;
+    }
+
+    /**
+     * Sanitize a create body before any hook runs, so a create always **inserts**.
+     * Drops the generated primary key and the create / update / delete date and
+     * version columns from the row and, recursively, from its owned child rows
+     * (one-to-many, inverse one-to-one). References (many-to-one, `...Id` columns,
+     * many-to-many) keep their ids. See `stripServerManagedFields`.
+     *
+     * Override only if clients must supply their own ids (e.g. offline-generated
+     * UUIDs) — and then guard against overwriting rows yourself:
+     *
+     * ```ts
+     * protected prepareCreateData(data: Partial<Note>) {
+     *   return data; // keep client ids
+     * }
+     * ```
+     */
+    protected prepareCreateData(data: Partial<T>): Partial<T> {
+        return stripServerManagedFields(this.repository.metadata, data);
+    }
+
+    /**
+     * Sanitize an update body before any hook runs: drops the create / update /
+     * delete date and version columns (so a client can't backdate a row or
+     * soft-delete it through `PUT`) and sets the primary key to the stored row's,
+     * so hooks never see an id that names another row.
+     */
+    protected prepareUpdateData(data: Partial<T>, oldData: T): Partial<T> {
+        const primaryKey = this.repository.metadata.primaryColumns[0].propertyName;
+        return {
+            ...stripAuditFields(this.repository.metadata, data),
+            [primaryKey]: (oldData as any)[primaryKey],
+        } as Partial<T>;
     }
 
     /**
@@ -336,7 +378,8 @@ export class CrudService<T extends BaseEntity> {
 
     /**
      * Hook that augments the WHERE used by every mutation-by-criteria method:
-     * `update` / `delete` / `deleteFromTrash` / `restore` and their bulk variants.
+     * `update` / `delete` / `deleteFromTrash` / `restore`, their bulk variants, and
+     * each per-row write of `reorder`.
      *
      * This is the **write-side counterpart** to `beforeFindMany` / `beforeFindOne`.
      * Whatever criteria you return is what loads AND mutates the row(s), so a row
@@ -352,8 +395,8 @@ export class CrudService<T extends BaseEntity> {
      * ```
      *
      * The criteria is column-level (TypeORM's `delete`/`update`/`restore` WHERE),
-     * so use plain columns — no relation joins. For single-row mutations `criteria`
-     * is `{ id }`; for bulk it's `{ id: In(ids) }`.
+     * so use plain columns — no relation joins. For single-row mutations (and each
+     * reorder write) `criteria` is `{ id }`; for bulk it's `{ id: In(ids) }`.
      *
      * @param criteria The id/where criteria the mutation is about to run.
      * @param _action  Which mutation is running (a `CrudActionsEnum` value).
@@ -369,9 +412,10 @@ export class CrudService<T extends BaseEntity> {
     /**
      * Hook that runs before `reorder()` writes the new positions.
      *
-     * Return a narrowed/transformed id list — e.g. keep only ids the caller owns,
-     * so `reorder` becomes tenant-safe (it can't be scoped by a WHERE because it
-     * writes positions per id):
+     * Return a narrowed/transformed id list. Tenant scoping doesn't need this any
+     * more — each reorder write already goes through `beforeMutate` — but it's the
+     * place to drop foreign ids up front so positions stay contiguous (0, 1, 2…)
+     * for the rows that are actually written:
      *
      * ```ts
      * protected async beforeReorder(ids: ID[]) {
@@ -397,12 +441,18 @@ export class CrudService<T extends BaseEntity> {
      * Hooks:
      * - `beforeSave()` then `beforeCreate()` run before persistence
      * - `afterSave()` then `afterCreate()` run after persistence
+     *
+     * Always inserts: a body `id` (and child-row ids) are dropped first by
+     * `prepareCreateData`, so a create can never overwrite an existing row.
      */
     async create(data: Partial<T>, saveOptions: SaveOptions = {}): Promise<T> {
+        if (data) {
+            data = this.prepareCreateData(data);
+        }
         if (!data || Object.keys(data).length === 0) {
             throw new BadRequestException('No data provided for insert.');
         }
-        data = await this.beforeSave(data);
+        data = await this.beforeSave(data, undefined, { action: CrudActionsEnum.CREATE });
 
         // Filter out invalid columns
         const validColumns = this.repository.metadata.columns.map(c => c.propertyName);
@@ -442,8 +492,13 @@ export class CrudService<T extends BaseEntity> {
         ..._others: any[]
     ): Promise<T[]> {
         return this.repository.manager.transaction(async (manager) => {
+            // Always insert: drop body / child ids before any hook (see prepareCreateData).
             let bulk = await Promise.all(
-                data.bulk.map(item => this.beforeSave(item)),
+                data.bulk.map(item => this.beforeSave(
+                    this.prepareCreateData(item),
+                    undefined,
+                    { action: CrudActionsEnum.CREATE_MANY },
+                )),
             );
 
             bulk = await Promise.all(
@@ -701,7 +756,9 @@ export class CrudService<T extends BaseEntity> {
      * - Output: updated entity `T` (reloaded from DB)
      *
      * Hooks:
-     * - `beforeSave()` then `beforeUpdate()` run before persistence
+     * - `beforeSave()` then `beforeUpdate()` run before persistence; both see the
+     *   stored row's primary key on `data`, and `beforeSave` gets the stored row as
+     *   `context.oldData`
      * - `afterSave()` then `afterUpdate()` run after persistence
      *
      * Throws `NotFoundException` if record doesn't exist.
@@ -712,8 +769,10 @@ export class CrudService<T extends BaseEntity> {
         if (!oldData) {
             throw new NotFoundException(`${this.repository.metadata.name} not found`);
         }
-        data = await this.beforeSave(data);
+        data = this.prepareUpdateData(data ?? {}, oldData);
+        data = await this.beforeSave(data, undefined, { action: CrudActionsEnum.UPDATE, oldData });
         data = await this.beforeUpdate(data, oldData);
+        // Pinned again after the hooks: the save always targets the loaded row.
         const entity = this.repository.create({
             ...data,
             id: oldData?.id,
@@ -757,8 +816,12 @@ export class CrudService<T extends BaseEntity> {
 
                 if (!oldData) continue;
 
-                let newData = await this.beforeSave(item);
-                newData = await this.beforeUpdate(newData, oldData);
+                let newData = this.prepareUpdateData(item, oldData as T);
+                newData = await this.beforeSave(newData, undefined, {
+                    action: CrudActionsEnum.UPDATE_MANY,
+                    oldData: oldData as T,
+                });
+                newData = await this.beforeUpdate(newData, oldData as T);
 
                 await manager.save(this.repository.create({
                     ...newData,
@@ -972,8 +1035,10 @@ export class CrudService<T extends BaseEntity> {
      * - Output: `{ success, message }`
      *
      * Hooks / config:
-     * - `beforeReorder(ids)` runs first — narrow the list (e.g. to tenant-owned
-     *   ids) to make reorder tenant-safe.
+     * - `beforeReorder(ids)` runs first — narrow or re-order the id list.
+     * - Each write goes through `beforeMutate(criteria, REORDER)` like every other
+     *   mutation, so a tenant scope there also scopes reorder: ids outside it are
+     *   simply not written.
      * - `reorderColumn` (default `order`) selects the column written; override it
      *   for entities that sort on a different column (e.g. `sortOrder`).
      *
@@ -1001,7 +1066,8 @@ export class CrudService<T extends BaseEntity> {
         // Wrap in a transaction so a partial reorder is never committed on failure.
         await this.repository.manager.transaction(async (manager) => {
             for (let i = 0; i < order.length; i++) {
-                await manager.update(this.repository.target, order[i] as any, { [column]: i } as any);
+                const where = await this.resolveMutateWhere(order[i], CrudActionsEnum.REORDER);
+                await manager.update(this.repository.target, where as any, { [column]: i } as any);
             }
         });
         return {

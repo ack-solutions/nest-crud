@@ -12,6 +12,7 @@ export * from './lib/service/crud-config.service';
 export * from './lib/helper/find-query-builder';
 export * from './lib/helper/request-query-parser';
 export * from './lib/helper/where-operators';
+export * from './lib/helper/new-row';
 
 // Middleware
 export * from './lib/middleware/method-override.middleware';
