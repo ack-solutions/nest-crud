@@ -4,6 +4,42 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+
+- **`create` / `createMany` always insert.** A body `id` passed the column filter
+  and `repository.save()` treated it as "update this row": a `POST` carrying another
+  tenant's id **overwrote that row** and moved it into the caller's tenant, and a
+  child row sent with an id (one-to-many, or the inverse side of a one-to-one) was
+  re-parented and rewritten the same way. The generated primary key and the
+  create / update / delete date and version columns are now dropped from the row
+  and, recursively, from owned child rows **before** any hook runs. References
+  (many-to-one objects, `...Id` columns, many-to-many links) keep their ids.
+- **Updates can no longer rewrite server-managed columns.** A `PUT` body's
+  `deletedAt` soft-deleted the row (bypassing the delete route, its guards and
+  hooks) and `createdAt` backdated it; update bodies now drop the date / version
+  columns.
+- **`reorder` goes through `beforeMutate`** like every other mutation (it wrote by
+  raw id), so a tenant scope there also scopes reorder.
+
+### Added
+
+- `beforeSave(data, request?, context?)` — a third argument `CrudSaveContext`
+  with the `action` and, for `update` / `updateMany`, the stored row (`oldData`).
+  On updates `data` now carries the stored row's primary key, even when the body
+  had none or named another row.
+- `stripServerManagedFields(metadata, body)` exported for custom (non-CRUD) create
+  paths; `prepareCreateData` / `prepareUpdateData` overridable on the service.
+
+### Upgrading
+
+- Hooks may still set any of the dropped fields — only the client body is cleaned.
+- If you pre-saved child rows and passed them (with ids) into `create()`, let the
+  cascade save them instead — their ids are now dropped, so they'd be inserted twice.
+- If clients legitimately supply their own ids (e.g. offline-generated UUIDs),
+  override `prepareCreateData(data)` to return `data`, and guard against overwrites.
+
 ## [2.1.1] — 2026-08-03
 
 Patch on the 2.x line. All packages release together at this version.

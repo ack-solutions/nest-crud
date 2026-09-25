@@ -105,6 +105,20 @@ export class UserService extends CrudService<User> {
 }
 ```
 
+::: tip Custom create paths
+`super.create()` already makes sure a create **inserts** (a body `id` or child-row
+ids can't overwrite existing rows — see
+[What the write hooks receive](./lifecycle-hooks.md#what-the-write-hooks-receive)).
+If you write rows yourself instead, apply the same rule with the exported helper:
+
+```ts
+import { stripServerManagedFields } from '@ackplus/nest-crud';
+
+const row = stripServerManagedFields(this.repository.metadata, body);
+await this.repository.save(this.repository.create(row));
+```
+:::
+
 **(b) Override the route handler** — define a method with the **same name** as the
 route. Do **not** add `@Get`/`@Post`; the factory wires the path, method, guards, and
 Swagger for you (your `@UseGuards` / `@ApiOperation` are merged):
