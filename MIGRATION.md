@@ -76,6 +76,33 @@ One behaviour tightening to be aware of: in an **aggregate** query, an unknown
 sortable). Plain (non-aggregate) queries are unchanged. An explicit `select` now
 always includes the primary key so nested relations keep hydrating.
 
+## Upgrading to 2.2 (security hardening of writes)
+
+`2.2.0` closes three write-path holes. Most apps upgrade with **no code changes** —
+the old behaviours below were never documented, and hooks can still set every field.
+
+| Before 2.2 | From 2.2 |
+| --- | --- |
+| `POST` with an existing row's `id` **overwrote that row** (child rows sent with ids were moved under the new parent) | create **always inserts**: the body's generated id and date/version columns are dropped, recursively through owned child rows; references (many-to-one, `...Id`, many-to-many) keep their ids |
+| `PUT` with `deletedAt` soft-deleted the row; `createdAt` backdated it | date / version columns in an update body are ignored |
+| `beforeSave(data)` on update saw the raw body — no id, or another row's | `data` carries the stored row's id, and `beforeSave(data, request, { action, oldData })` gets the stored row |
+| `reorder` wrote by raw id, ignoring `beforeMutate` | each reorder write goes through `beforeMutate` |
+
+Check these three things when you upgrade:
+
+1. **Do you pre-save child rows, then pass them (with their ids) into `create()`?**
+   Those ids are now dropped, so the children would be inserted twice. Remove the
+   pre-save and let the cascade write them.
+2. **Do clients send their own ids on create on purpose** (e.g. offline-generated
+   UUIDs)? Override `prepareCreateData(data)` to return `data` unchanged, and guard
+   against overwriting existing rows yourself.
+3. **Do you write rows outside `CrudService.create()`?** Apply the same rule there
+   with the exported `stripServerManagedFields(repository.metadata, body)`.
+
+Entities whose primary key the client supplies (a non-generated `@PrimaryColumn`)
+keep it; for those, `create` still behaves as before. Details:
+[What the write hooks receive](./docs/lifecycle-hooks.md#what-the-write-hooks-receive).
+
 ## Already supported — no change needed
 
 - **Custom / extra routes.** Add standard NestJS route methods (`@Get`, `@Post`, …)
@@ -95,5 +122,6 @@ always includes the primary key so nested relations keep hydrating.
 npm install @ackplus/nest-crud@^2 @ackplus/nest-crud-request@^2
 ```
 
-v2 is published on the `next` dist-tag first; once validated it is promoted to
-`latest`.
+Releases are published to the `latest` dist-tag; all three packages
+(`@ackplus/nest-crud`, `@ackplus/nest-crud-request`, `nest_crud_request`) share one
+version. See the [CHANGELOG](./CHANGELOG.md) for per-release notes.

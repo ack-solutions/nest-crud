@@ -4,41 +4,66 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.2.0] — 2026-09-25
+
+Security hardening of the write path, plus hook context for updates. All packages
+release together at this version.
+
+Released as a **minor**: the behaviours removed below were never documented or
+supported, and every existing hook, route and client call keeps working. Most apps
+upgrade with no code changes — see [Upgrading](#upgrading-to-220) below and the
+[migration guide](./MIGRATION.md#upgrading-to-22-security-hardening-of-writes).
 
 ### Security
 
 - **`create` / `createMany` always insert.** A body `id` passed the column filter
   and `repository.save()` treated it as "update this row": a `POST` carrying another
-  tenant's id **overwrote that row** and moved it into the caller's tenant, and a
-  child row sent with an id (one-to-many, or the inverse side of a one-to-one) was
+  tenant's id **overwrote that row** and moved it into the caller's tenant. A child
+  row sent with an id (one-to-many, or the inverse side of a one-to-one) was
   re-parented and rewritten the same way. The generated primary key and the
   create / update / delete date and version columns are now dropped from the row
   and, recursively, from owned child rows **before** any hook runs. References
-  (many-to-one objects, `...Id` columns, many-to-many links) keep their ids.
+  (many-to-one objects, `...Id` columns, many-to-many links, the owning side of a
+  one-to-one) keep their ids, so linking to existing rows works as before.
 - **Updates can no longer rewrite server-managed columns.** A `PUT` body's
   `deletedAt` soft-deleted the row (bypassing the delete route, its guards and
-  hooks) and `createdAt` backdated it; update bodies now drop the date / version
-  columns.
+  hooks) and `createdAt` backdated it. Update bodies now drop the create / update /
+  delete date and version columns.
 - **`reorder` goes through `beforeMutate`** like every other mutation (it wrote by
-  raw id), so a tenant scope there also scopes reorder.
+  raw id), so a tenant scope there also scopes reorder: ids outside the scope are
+  not written. With the default (no-op) `beforeMutate` nothing changes.
 
 ### Added
 
-- `beforeSave(data, request?, context?)` — a third argument `CrudSaveContext`
-  with the `action` and, for `update` / `updateMany`, the stored row (`oldData`).
-  On updates `data` now carries the stored row's primary key, even when the body
-  had none or named another row.
-- `stripServerManagedFields(metadata, body)` exported for custom (non-CRUD) create
-  paths; `prepareCreateData` / `prepareUpdateData` overridable on the service.
+- **Hook context on saves.** `beforeSave(data, request?, context?)` gets a third,
+  optional argument `CrudSaveContext` — `{ action, oldData? }`. For `update` /
+  `updateMany`, `oldData` is the stored row as loaded before the change, so a hook
+  can merge a partial body or enforce "locked after confirm" rules without loading
+  the row again. Existing two-argument overrides keep working.
+- **`stripServerManagedFields(metadata, body)`** exported — the same create rule for
+  your own (non-CRUD) create paths.
+- **`prepareCreateData(data)` / `prepareUpdateData(data, oldData)`** — overridable
+  service methods where the sanitizing happens (e.g. to keep client-generated ids).
 
-### Upgrading
+### Changed
+
+- On `update` / `updateMany`, the payload hooks receive now carries the **stored
+  row's primary key** — previously it had no id, or whatever id the body sent. The
+  save itself was already pinned to the loaded row and still is (also after hooks).
+- A create body containing **only** server-managed fields (e.g. just `{ "id": … }`)
+  now returns `400 No data provided for insert.` instead of rewriting that row.
+
+### Upgrading to 2.2.0
 
 - Hooks may still set any of the dropped fields — only the client body is cleaned.
-- If you pre-saved child rows and passed them (with ids) into `create()`, let the
-  cascade save them instead — their ids are now dropped, so they'd be inserted twice.
-- If clients legitimately supply their own ids (e.g. offline-generated UUIDs),
-  override `prepareCreateData(data)` to return `data`, and guard against overwrites.
+- If you pre-saved child rows and then passed them (with their ids) into `create()`,
+  remove the pre-save and let the cascade write them — their ids are now dropped, so
+  they would be inserted twice.
+- If clients supply their own ids on purpose (e.g. offline-generated UUIDs),
+  override `prepareCreateData(data)` to return `data` unchanged, and guard against
+  overwriting existing rows yourself.
+- Entities with a client-supplied (non-generated) `@PrimaryColumn` keep it; `create`
+  behaves as before for them.
 
 ## [2.1.1] — 2026-08-03
 
