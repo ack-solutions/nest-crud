@@ -720,6 +720,7 @@ export class CrudService<T extends BaseEntity> {
      */
     async findOne(id: ID, query: IFindOneOptions = {}, ..._others: any[]): Promise<T> {
         // Parse query parameters for joins
+        this.assertFindableId(id);
         const parsedOptions = RequestQueryParser.parse(query || {});
         // Gate the client soft-delete flags here too, so `allowSoftDeleteFilter`
         // covers EVERY read (findOne can otherwise fetch a trashed row by id via
@@ -765,6 +766,7 @@ export class CrudService<T extends BaseEntity> {
      * Throws `NotFoundException` if record doesn't exist.
      */
     async update(criteria: ID | FindOptionsWhere<T>, data: Partial<T>, ..._others: any[]) {
+        this.assertFindableId(criteria);
         const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.UPDATE);
         const oldData = await this.repository.findOne({ where });
         if (!oldData) {
@@ -808,7 +810,8 @@ export class CrudService<T extends BaseEntity> {
 
             for (const item of data.bulk) {
                 const id = item.id;
-                if (!id) continue;
+                // No id, or one that can't match a row: skipped like a row not found.
+                if (!this.isValidId(id)) continue;
 
                 const where = await this.resolveMutateWhere(id, CrudActionsEnum.UPDATE_MANY);
 
@@ -865,6 +868,7 @@ export class CrudService<T extends BaseEntity> {
      * Throws `NotFoundException` if record doesn't exist.
      */
     async delete(criteria: ID | FindOptionsWhere<T>, softDelete?: boolean, ..._others: any) {
+        this.assertFindableId(criteria);
         const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.DELETE);
 
         const oldData = await this.repository.findOne({ where });
@@ -937,6 +941,7 @@ export class CrudService<T extends BaseEntity> {
      * - Reads with `withDeleted: true` so it can target soft-deleted rows.
      */
     async deleteFromTrash(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
+        this.assertFindableId(criteria);
         const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.DELETE_FROM_TRASH);
 
         const oldData = await this.repository.findOne({
@@ -997,6 +1002,7 @@ export class CrudService<T extends BaseEntity> {
      * - Reads with `withDeleted: true` so it can restore soft-deleted rows.
      */
     async restore(criteria: ID | FindOptionsWhere<T>, ..._others: any[]) {
+        this.assertFindableId(criteria);
         const where = await this.resolveMutateWhere(criteria, CrudActionsEnum.RESTORE);
 
         const oldData = await this.repository.findOne({
@@ -1025,7 +1031,7 @@ export class CrudService<T extends BaseEntity> {
      * - Output: `{ success: true, message: string }`
      */
     async restoreMany(params: { ids: ID[] }, ..._others: any[]) {
-        const ids = await this.beforeRestoreMany(params.ids);
+        const ids = await this.beforeRestoreMany(this.toIdList(params?.ids as any));
         if (ids?.length > 0) {
             const where = await this.resolveMutateWhere(
                 { id: In(ids) } as FindOptionsWhere<T>,
@@ -1059,7 +1065,7 @@ export class CrudService<T extends BaseEntity> {
      * - Writes \(N\) updates (one per id) inside a transaction.
      */
     async reorder(order: ID[], ..._others: any[]) {
-        order = await this.beforeReorder(order ?? []);
+        order = await this.beforeReorder(this.toIdList(order as any));
         if (!order?.length) {
             return {
                 success: true,
@@ -1119,7 +1125,29 @@ export class CrudService<T extends BaseEntity> {
      */
     protected toIdList(ids: ID | ID[] | undefined | null): ID[] {
         if (ids === undefined || ids === null) return [];
-        return Array.isArray(ids) ? ids : [ids];
+        return (Array.isArray(ids) ? ids : [ids]).filter((id) => this.isValidId(id));
+    }
+
+    /**
+     * Whether `id` can possibly match a row. For a UUID primary key, a value that
+     * isn't UUID-shaped never can — and databases with a real `uuid` type (Postgres)
+     * raise an error on it instead of matching nothing. Such ids are treated as "not
+     * found": `404` on single-row routes, skipped in bulk ones.
+     */
+    protected isValidId(id: unknown): boolean {
+        if (id === undefined || id === null || id === '') return false;
+        const pk = this.repository.metadata.primaryColumns[0];
+        const isUuid = pk?.type === 'uuid' || pk?.generationStrategy === 'uuid';
+        if (!isUuid) return true;
+        return typeof id === 'string'
+            && /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i.test(id);
+    }
+
+    /** `404` when a by-id criteria carries an id that can't match (see `isValidId`). */
+    private assertFindableId(criteria: ID | FindOptionsWhere<T>): void {
+        if ((typeof criteria === 'string' || typeof criteria === 'number') && !this.isValidId(criteria)) {
+            throw new NotFoundException(`${this.repository.metadata.name} not found`);
+        }
     }
 
 }

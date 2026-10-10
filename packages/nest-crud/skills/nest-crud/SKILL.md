@@ -26,7 +26,7 @@ export class NoteService extends CrudService<Note> {
 
 @Crud({ entity: Note, path: 'notes', softDelete: true })   // also registers the controller path
 export class NoteController {
-  constructor(public service: NoteService) {}   // must be a public `service`
+  constructor(public service: NoteService) {}   // the property must be named `service`
 }
 ```
 
@@ -35,6 +35,23 @@ Routes: `GET /` (page: `{ items, total }`), `GET /get/all`, `GET /get/counts`,
 `DELETE /delete/bulk?ids=`, `PUT /reorder`; with `softDelete: true` also
 `PUT /:id/restore`, `PUT /restore/bulk`, `DELETE /:id/trash`, `DELETE /trash/bulk?ids=`.
 Disable one with `routes: { reorder: false }`.
+
+## Use the generated API before writing a new endpoint
+
+Most "new endpoint" requests are already covered. Reach for a custom route only when
+none of these fit:
+
+| Need | Already there |
+| --- | --- |
+| Search / filter / sort / paginate a list | `GET /` with `where`, `order`, `take`, `skip` |
+| Dropdown or export of all matching rows | `GET /get/all` (same filters, no paging) |
+| Badge or tab counts, counts per status | `GET /get/counts?filter=…&groupByKey=status` |
+| "Number of posts per user" on each row | `aggregates` (+ `having`, order by the alias) |
+| Load related data | `relations` (no extra "with-details" endpoint) |
+| Trash view / count | `filter` or query with `onlyDeleted: true` |
+| Save or delete many rows | `POST /bulk`, `PUT /bulk`, `DELETE /delete/bulk?ids=` |
+| Drag-and-drop ordering | `PUT /reorder` |
+| Different logic on a standard route | override the service method or hook, keep the route |
 
 ## Querying (client side)
 
@@ -100,10 +117,18 @@ export abstract class TenantCrudService<T extends BaseEntity> extends CrudServic
 - The body is cleaned **before** hooks: on create the generated `id` and date/version
   columns are dropped (also from child rows), so a create always inserts; on update
   the body carries the stored row's `id`. Don't re-implement this.
-- `beforeSave(data, request, ctx)` — `ctx.action`, and on updates `ctx.oldData` (the
-  stored row). Use it instead of loading the row again.
+- `beforeSave(data, request, ctx)`, `beforeCreate(data, request, ctx)` and
+  `beforeUpdate(data, oldData, ctx)` all receive `ctx`: `ctx.action`, on updates
+  `ctx.oldData` (the stored row — don't load it again), in bulk `ctx.manager`.
 - **Bulk routes run in one transaction.** In a before-hook, database work must go
   through `ctx.manager` (not `this.repository`). After-hooks run after the commit.
+- **Bulk replies list only what was written.** `PUT /bulk` skips an item with no id,
+  a malformed id, or a row outside the `beforeMutate` scope, without an error —
+  compare the ids you sent with the ids returned to report skips.
+- Cap bulk requests with `@Crud({ maxBulkSize: 200 })` (or globally in
+  `NestCrudModule.forRoot`); larger requests get `400`. There is no cap by default.
+- A malformed id (not a UUID) is "not found": `404` on single routes, skipped in bulk.
+  Don't add your own id-format checks.
 - Don't save child rows yourself and then pass them to `create()` — let the cascade
   write them.
 - Writing rows outside `CrudService.create()`? Clean the body with
@@ -126,6 +151,7 @@ export abstract class TenantCrudService<T extends BaseEntity> extends CrudServic
 | Another tenant's row can be updated | Only read hooks are scoped; add `beforeMutate` |
 | Scope added in a read hook has no effect | The hook didn't return the query builder |
 | Bulk update hangs or hook sees old values | Hook used `this.repository` inside the bulk transaction; use `ctx.manager` |
+| Bulk request with hundreds of items accepted | No cap by default; set `maxBulkSize` |
 | Reorder fails with "column does not exist" | Set `protected reorderColumn = 'sortOrder'` on the service |
 | Global `maxPageSize` not applied | Use `NestCrudModule.forRoot({ maxPageSize })` |
 | Import error from `@ackplus/nest-crud/dist/...` | Import only from the package root |
