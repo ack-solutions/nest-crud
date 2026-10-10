@@ -4,6 +4,7 @@ import {
     RelationOptions,
     WhereOptions
 } from '../types';
+import type { EntityManager } from 'typeorm';
 import { CanActivate, NestInterceptor, RequestMethod, Type, ValidationPipeOptions } from '@nestjs/common';
 
 
@@ -106,6 +107,13 @@ export interface CrudSaveContext<T = any> {
     action: CrudActionsEnum;
     /** The stored row (update / updateMany only). */
     oldData?: T;
+    /**
+     * The transaction's entity manager (`createMany` / `updateMany` only). The bulk
+     * methods save inside one transaction; a before-hook that reads or writes the
+     * database must use this manager to see (and be part of) that transaction —
+     * `this.repository` runs on another connection, outside it.
+     */
+    manager?: EntityManager;
 }
 
 

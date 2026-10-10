@@ -2,6 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 
+import { CrudSaveContext, CrudService } from '@ackplus/nest-crud';
+
+import { User } from '../src/database/entities/user.entity';
 import { bootstrapPgApp, describePg, truncateAll } from './pg-setup';
 
 /**
@@ -189,6 +192,48 @@ describePg('Postgres e2e (real database)', () => {
       const res = await http().get('/tasks').query({ order: JSON.stringify({ order: 'ASC' }) }).expect(200);
       expect(res.body.items.map((t: any) => t.title)).toEqual(['T3', 'T1', 'T2']);
       expect(res.body.items.map((t: any) => t.order)).toEqual([0, 1, 2]);
+    });
+  });
+
+  // Needs a real second connection: the bulk methods save inside one transaction,
+  // and a hook that uses `this.repository` runs on another connection.
+  describe('bulk hooks and the transaction', () => {
+    /** afterUpdate reads the row and writes back to it through the plain repository. */
+    class AfterHookService extends CrudService<User> {
+      seenAge: number[] = [];
+      protected async afterUpdate(user: User) {
+        const fresh = await this.repository.findOneByOrFail({ id: user.id });
+        this.seenAge.push(fresh.age); // must be the committed, new value
+        await this.repository.update(user.id, { lastName: 'touched' }); // must not hang
+        return user;
+      }
+    }
+
+    /** beforeSave reads through the transaction's manager. */
+    class BeforeHookService extends CrudService<User> {
+      countsInTx: number[] = [];
+      protected async beforeSave(data: Partial<User>, _req?: any, ctx?: CrudSaveContext<User>) {
+        if (ctx?.manager) this.countsInTx.push(await ctx.manager.count(User));
+        return data;
+      }
+    }
+
+    it('updateMany: after-hooks run after commit — they see the new values and can write the row', async () => {
+      const { alice, bob } = await seed();
+      const svc = new AfterHookService(ds.getRepository(User));
+      await svc.updateMany({ bulk: [{ id: alice.id, age: 31 }, { id: bob.id, age: 26 }] as any });
+      expect(svc.seenAge).toEqual([31, 26]);
+      const rows = await ds.getRepository(User).findBy({ lastName: 'touched' });
+      expect(rows).toHaveLength(2);
+    }, 15000);
+
+    it('createMany: before-hooks get the transaction manager and see rows saved earlier in it', async () => {
+      await seed(); // 3 users committed
+      const svc = new BeforeHookService(ds.getRepository(User));
+      await svc.createMany({
+        bulk: [{ email: 'd@e.com', firstName: 'D', lastName: 'D', password: 'h' }] as any,
+      });
+      expect(svc.countsInTx).toEqual([3]);
     });
   });
 });

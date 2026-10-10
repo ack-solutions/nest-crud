@@ -77,6 +77,37 @@ protected async beforeSave(data: Partial<Invoice>, _req?: any, ctx?: CrudSaveCon
 `ctx.action` is `create` / `createMany` / `update` / `updateMany`; `ctx.oldData` is
 set for the two update actions.
 
+### Bulk saves run in one transaction
+
+`createMany` and `updateMany` save all their rows inside a single transaction. That
+matters for hooks that touch the database, because `this.repository` uses a
+different connection from the one holding the transaction:
+
+- **Before-hooks** (`beforeSave`, `beforeCreate`, `beforeUpdate`) run inside the
+  transaction and receive its entity manager as `ctx.manager`. Use it for any read
+  or write that must see rows saved earlier in the same request, or be rolled back
+  with it. `ctx.manager` is only set for the two bulk actions.
+- **After-hooks** (`afterSave`, `afterCreate`, `afterUpdate`) run **after the
+  transaction has committed**, the same as for single `create` / `update`. They see
+  the new values through `this.repository`, and can write to the row they were
+  called for. An after-hook that throws does not undo the saved rows.
+
+```ts
+protected async beforeUpdate(data: Partial<Product>, old?: Product, ctx?: CrudSaveContext<Product>) {
+  const repo = ctx?.manager ? ctx.manager.getRepository(PriceHistory) : this.priceHistory;
+  if (old && data.price !== undefined && data.price !== old.price) {
+    await repo.save({ productId: old.id, from: old.price, to: data.price });
+  }
+  return data;
+}
+```
+
+`updateMany` returns only the rows it updated: an item without an `id`, or whose row
+isn't found (or is outside your `beforeMutate` scope), is skipped without an error.
+Compare the returned ids with the ones you sent if you need to report skips. Neither
+bulk route caps the number of items; limit the request body size or validate the
+array length in your DTO if you need a cap.
+
 ::: warning Upgrading from ≤ 2.1
 If you pre-saved child rows yourself and then passed them (with their ids) into
 `create()`, those ids are now dropped and the children would be inserted twice —
