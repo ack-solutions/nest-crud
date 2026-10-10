@@ -5,6 +5,9 @@
   "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nest-crud": "./bin/nest-crud.js"
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json",
@@ -17,6 +20,8 @@
   },
   "files": [
     "dist",
+    "bin",
+    "skills",
     "README.md",
     "LICENSE"
   ],

@@ -1,5 +1,7 @@
 # @ackplus/nest-crud
 
+> 🤖 **Using an AI assistant?** Run `npx @ackplus/nest-crud add-skill`, or have it read <https://ack-solutions.github.io/nest-crud/skill.md>. [Details](https://ack-solutions.github.io/nest-crud/ai-assistants)
+
 > **Part of the [nest-crud](https://github.com/ack-solutions/nest-crud) family** — one server + two query-builder clients, released together at the same version:
 >
 > | Package | Get it | Docs |
