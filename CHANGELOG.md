@@ -4,6 +4,38 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Bulk hooks no longer run on the wrong side of the transaction.** `updateMany`
+  and `createMany` save inside one transaction but called every hook without its
+  entity manager, so a hook using `this.repository` ran on another connection:
+  - an `afterUpdate` / `afterSave` that **wrote to the row being updated** waited
+    forever on the transaction's own lock (the request never answered);
+  - a hook that **read** the row saw the values from before the change.
+
+  After-hooks (`afterSave`, `afterCreate`, `afterUpdate`) now run **after the
+  transaction commits**, as they already did for single `create` / `update`.
+  Before-hooks receive the transaction's manager as `context.manager`.
+
+### Added
+
+- `CrudSaveContext.manager` — the transaction's `EntityManager`, set for
+  `createMany` / `updateMany`.
+- `beforeCreate(data, request?, context?)` and `beforeUpdate(data, oldData?, context?)`
+  now receive the same `CrudSaveContext` as `beforeSave`. Existing overrides keep
+  working.
+
+### Changed
+
+- In `createMany` / `updateMany`, an after-hook that throws no longer rolls back the
+  saved rows (they are already committed) — the same as single `create` / `update`.
+  Do work that must be atomic with the save in a before-hook through
+  `context.manager`.
+- `createMany` runs its before-hooks one item at a time instead of concurrently, so
+  hooks can safely query through `context.manager`.
+
 ## [2.2.0] — 2026-09-25
 
 Security hardening of the write path, plus hook context for updates. All packages

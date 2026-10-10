@@ -123,7 +123,7 @@ export class CrudService<T extends BaseEntity> {
      * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
      * - Remove/override unsafe values before saving
      */
-    protected async beforeCreate(entity: Partial<T>, _request?: any) {
+    protected async beforeCreate(entity: Partial<T>, _request?: any, _context?: CrudSaveContext<T>) {
         return entity;
     }
 
@@ -147,7 +147,7 @@ export class CrudService<T extends BaseEntity> {
      * - Set server-side defaults (e.g. `createdBy`, `updatedBy`)
      * - Remove/override unsafe values before saving
      */
-    protected async beforeUpdate(entity: Partial<T>, _entityData?: T) {
+    protected async beforeUpdate(entity: Partial<T>, _entityData?: T, _context?: CrudSaveContext<T>) {
         return entity;
     }
 
@@ -452,7 +452,8 @@ export class CrudService<T extends BaseEntity> {
         if (!data || Object.keys(data).length === 0) {
             throw new BadRequestException('No data provided for insert.');
         }
-        data = await this.beforeSave(data, undefined, { action: CrudActionsEnum.CREATE });
+        const context: CrudSaveContext<T> = { action: CrudActionsEnum.CREATE };
+        data = await this.beforeSave(data, undefined, context);
 
         // Filter out invalid columns
         const validColumns = this.repository.metadata.columns.map(c => c.propertyName);
@@ -460,7 +461,7 @@ export class CrudService<T extends BaseEntity> {
         const validProperties = [...validColumns, ...validRelations];
 
         let filteredData: any = Object.fromEntries(Object.entries(data).filter(([key]) => validProperties.includes(key)));
-        filteredData = await this.beforeCreate(filteredData);
+        filteredData = await this.beforeCreate(filteredData, undefined, context);
 
         const entity = this.repository.create(filteredData);
         const saved = await this.repository.save(entity as unknown as T, saveOptions);
@@ -491,19 +492,17 @@ export class CrudService<T extends BaseEntity> {
         saveOptions: SaveOptions = {},
         ..._others: any[]
     ): Promise<T[]> {
-        return this.repository.manager.transaction(async (manager) => {
+        const reloaded = await this.repository.manager.transaction(async (manager) => {
+            const context: CrudSaveContext<T> = { action: CrudActionsEnum.CREATE_MANY, manager };
             // Always insert: drop body / child ids before any hook (see prepareCreateData).
-            let bulk = await Promise.all(
-                data.bulk.map(item => this.beforeSave(
-                    this.prepareCreateData(item),
-                    undefined,
-                    { action: CrudActionsEnum.CREATE_MANY },
-                )),
-            );
-
-            bulk = await Promise.all(
-                bulk.map(item => this.beforeCreate(item)),
-            );
+            // Sequential, not Promise.all: hooks may query through `context.manager`,
+            // and concurrent queries on a transaction's single connection are unsafe.
+            const bulk: Partial<T>[] = [];
+            for (const item of data.bulk) {
+                let row = await this.beforeSave(this.prepareCreateData(item), undefined, context);
+                row = await this.beforeCreate(row, undefined, context);
+                bulk.push(row);
+            }
 
             const entities = manager.create(this.repository.target as any, bulk);
 
@@ -519,15 +518,17 @@ export class CrudService<T extends BaseEntity> {
                 where: { [primaryKey]: In(ids) },
             }) as T[];
             const byId = new Map(found.map((e: any) => [String(e[primaryKey]), e]));
-            const reloaded = savedEntities.map((saved: any) => byId.get(String(saved[primaryKey])) ?? saved) as T[];
-
-            for (let i = 0; i < reloaded.length; i++) {
-                await this.afterSave(reloaded[i], null, data.bulk[i]);
-                await this.afterCreate(reloaded[i], null, data.bulk[i]);
-            }
-
-            return reloaded;
+            return savedEntities.map((saved: any) => byId.get(String(saved[primaryKey])) ?? saved) as T[];
         });
+
+        // After-hooks run once the transaction has committed (like single create()):
+        // a hook using `this.repository` sees the saved rows and can't block on them.
+        for (let i = 0; i < reloaded.length; i++) {
+            await this.afterSave(reloaded[i], null, data.bulk[i]);
+            await this.afterCreate(reloaded[i], null, data.bulk[i]);
+        }
+
+        return reloaded;
     }
 
     async findMany(query: IFindManyOptions, crudOptions?: Partial<CrudOptions>, ..._others: any[]): Promise<PaginationResponse<T>> {
@@ -770,8 +771,9 @@ export class CrudService<T extends BaseEntity> {
             throw new NotFoundException(`${this.repository.metadata.name} not found`);
         }
         data = this.prepareUpdateData(data ?? {}, oldData);
-        data = await this.beforeSave(data, undefined, { action: CrudActionsEnum.UPDATE, oldData });
-        data = await this.beforeUpdate(data, oldData);
+        const context: CrudSaveContext<T> = { action: CrudActionsEnum.UPDATE, oldData };
+        data = await this.beforeSave(data, undefined, context);
+        data = await this.beforeUpdate(data, oldData, context);
         // Pinned again after the hooks: the save always targets the loaded row.
         const entity = this.repository.create({
             ...data,
@@ -801,8 +803,8 @@ export class CrudService<T extends BaseEntity> {
         data: { bulk: (Partial<T> & { id: ID })[] },
         ..._others: any[]
     ): Promise<T[]> {
-        return this.repository.manager.transaction(async (manager) => {
-            const results: T[] = [];
+        const saved = await this.repository.manager.transaction(async (manager) => {
+            const results: Array<{ updated: T; oldData: T; newData: Partial<T> }> = [];
 
             for (const item of data.bulk) {
                 const id = item.id;
@@ -817,11 +819,13 @@ export class CrudService<T extends BaseEntity> {
                 if (!oldData) continue;
 
                 let newData = this.prepareUpdateData(item, oldData as T);
-                newData = await this.beforeSave(newData, undefined, {
+                const context: CrudSaveContext<T> = {
                     action: CrudActionsEnum.UPDATE_MANY,
                     oldData: oldData as T,
-                });
-                newData = await this.beforeUpdate(newData, oldData as T);
+                    manager,
+                };
+                newData = await this.beforeSave(newData, undefined, context);
+                newData = await this.beforeUpdate(newData, oldData as T, context);
 
                 await manager.save(this.repository.create({
                     ...newData,
@@ -833,14 +837,22 @@ export class CrudService<T extends BaseEntity> {
                 });
 
                 if (updated) {
-                    await this.afterSave(updated, oldData, newData);
-                    await this.afterUpdate(updated, oldData, newData);
-                    results.push(updated);
+                    results.push({ updated: updated as T, oldData: oldData as T, newData });
                 }
             }
 
             return results;
         });
+
+        // After-hooks run once the transaction has committed (like single update()):
+        // a hook using `this.repository` sees the new values, and writing to the row
+        // it was called for no longer waits on the transaction's own lock.
+        for (const { updated, oldData, newData } of saved) {
+            await this.afterSave(updated, oldData, newData);
+            await this.afterUpdate(updated, oldData, newData);
+        }
+
+        return saved.map((r) => r.updated);
     }
 
     /**

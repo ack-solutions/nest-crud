@@ -202,6 +202,61 @@ describe('create always inserts; update hooks know their row; reorder is scoped'
         });
     });
 
+    describe('bulk hooks and the transaction', () => {
+        /** Records, for every hook call, whether the bulk transaction was still open. */
+        class TxSpyService extends CrudService<User> {
+            log: Array<{ hook: string; inTx: boolean; hasManager: boolean }> = [];
+            private note(hook: string, ctx?: CrudSaveContext<User>) {
+                this.log.push({
+                    hook,
+                    inTx: !!this.repository.manager.connection.createQueryRunner().isTransactionActive,
+                    hasManager: !!ctx?.manager,
+                });
+            }
+            protected async beforeSave(d: Partial<User>, _r?: any, ctx?: CrudSaveContext<User>) { this.note('beforeSave', ctx); return d; }
+            protected async beforeCreate(d: Partial<User>, _r?: any, ctx?: CrudSaveContext<User>) { this.note('beforeCreate', ctx); return d; }
+            protected async beforeUpdate(d: Partial<User>, _old?: User, ctx?: CrudSaveContext<User>) { this.note('beforeUpdate', ctx); return d; }
+            protected async afterSave(u: User) { this.note('afterSave'); return u; }
+            protected async afterCreate(u: User) { this.note('afterCreate'); return u; }
+            protected async afterUpdate(u: User) { this.note('afterUpdate'); return u; }
+        }
+        const of = (svc: TxSpyService, hook: string) => svc.log.filter((l) => l.hook === hook);
+
+        it('updateMany: before-hooks get the transaction manager; after-hooks run after commit', async () => {
+            const svc = new TxSpyService(users);
+            const out = await svc.updateMany({ bulk: [{ id: a.id, name: 'A2' }, { id: b.id, name: 'B2' }] as any });
+            expect(out.map((u) => u.name)).toEqual(['A2', 'B2']);
+            for (const hook of ['beforeSave', 'beforeUpdate']) {
+                expect(of(svc, hook)).toHaveLength(2);
+                expect(of(svc, hook).every((l) => l.hasManager && l.inTx)).toBe(true);
+            }
+            for (const hook of ['afterSave', 'afterUpdate']) {
+                expect(of(svc, hook)).toHaveLength(2);
+                expect(of(svc, hook).every((l) => !l.inTx)).toBe(true);
+            }
+        });
+
+        it('createMany: before-hooks get the transaction manager; after-hooks run after commit', async () => {
+            const svc = new TxSpyService(users);
+            await svc.createMany({ bulk: [{ name: 'N1' }, { name: 'N2' }] });
+            for (const hook of ['beforeSave', 'beforeCreate']) {
+                expect(of(svc, hook)).toHaveLength(2);
+                expect(of(svc, hook).every((l) => l.hasManager && l.inTx)).toBe(true);
+            }
+            for (const hook of ['afterSave', 'afterCreate']) {
+                expect(of(svc, hook)).toHaveLength(2);
+                expect(of(svc, hook).every((l) => !l.inTx)).toBe(true);
+            }
+        });
+
+        it('single create / update: hooks get a context without a manager (no transaction)', async () => {
+            const svc = new TxSpyService(users);
+            await svc.create({ name: 'N' });
+            await svc.update(a.id, { name: 'A3' });
+            expect(svc.log.some((l) => l.hasManager)).toBe(false);
+        });
+    });
+
     describe('reorder', () => {
         it('each write goes through beforeMutate: ids outside the scope are not written', async () => {
             const [mine1, mine2, theirs] = await items.save(items.create([
