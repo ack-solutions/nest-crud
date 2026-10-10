@@ -34,6 +34,7 @@ For validation errors, `message` is an array of strings.
   a bad `as` alias (must match `^[A-Za-z_][A-Za-z0-9_]*$`), or one colliding with a real column.
 - A `having` key that isn't a defined aggregate alias.
 - `take` (page size) greater than `maxPerPage`.
+- A bulk request with more items than `maxBulkSize` (when set).
 - An invalid `groupByKey` on `counts`.
 - An empty body on `create`.
 - Postgres-only operators (`$contArr`, `$intersectsArr`) on a non-Postgres database.
@@ -42,7 +43,9 @@ For validation errors, `message` is an array of strings.
 ## What raises `404`
 
 `findOne`, `update`, `delete`, `restore`, and `deleteFromTrash` throw
-`NotFoundException` when no row matches the id/criteria.
+`NotFoundException` when no row matches the id/criteria — including an id that isn't
+a valid UUID for a UUID primary key (it can't match any row). Bulk routes skip such
+ids instead.
 
 ## Customising errors
 

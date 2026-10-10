@@ -102,11 +102,12 @@ protected async beforeUpdate(data: Partial<Product>, old?: Product, ctx?: CrudSa
 }
 ```
 
-`updateMany` returns only the rows it updated: an item without an `id`, or whose row
-isn't found (or is outside your `beforeMutate` scope), is skipped without an error.
-Compare the returned ids with the ones you sent if you need to report skips. Neither
-bulk route caps the number of items; limit the request body size or validate the
-array length in your DTO if you need a cap.
+`updateMany` returns only the rows it updated: an item without an `id`, with a
+malformed id, or whose row isn't found (or is outside your `beforeMutate` scope) is
+skipped without an error. Compare the returned ids with the ones you sent if you need
+to report skips. Bulk routes have no item cap by default; set
+`@Crud({ maxBulkSize })` (or `NestCrudModule.forRoot({ maxBulkSize })`) to reject
+larger requests with `400`.
 
 ::: warning Upgrading from ≤ 2.1
 If you pre-saved child rows yourself and then passed them (with their ids) into

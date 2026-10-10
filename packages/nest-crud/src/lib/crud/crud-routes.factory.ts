@@ -14,7 +14,7 @@ import { Validation } from './validation.helper';
 import { CrudActionsEnum, CrudOptions, CrudRoutesOptions, CrudValidationGroupsEnum, RouteOptionsWithName } from '../interface/crud';
 import { ID } from '../interface/typeorm';
 import { CrudConfigService } from '../service/crud-config.service';
-import { resolveMaxPerPage } from '../helper/pagination-limit';
+import { assertBulkSize, resolveMaxPerPage } from '../helper/pagination-limit';
 
 /**
  * Factory class responsible for creating and configuring CRUD routes dynamically.
@@ -239,6 +239,7 @@ export class CrudRoutesFactory {
     protected createManyHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function createMany(dto: any) {
             checkService(this);
+            assertBulkSize(dto?.bulk?.length ?? 0, R.getCrudOptions(this.constructor));
             return this.service.createMany(dto);
         };
     }
@@ -263,6 +264,7 @@ export class CrudRoutesFactory {
     protected updateManyHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function updateMany(dto: any) {
             checkService(this);
+            assertBulkSize(dto?.bulk?.length ?? 0, R.getCrudOptions(this.constructor));
             return this.service.updateMany(dto);
         };
     }
@@ -293,6 +295,7 @@ export class CrudRoutesFactory {
             checkService(this);
             const options = R.getCrudOptions(this.constructor);
             const softDelete = !!options?.softDelete;
+            assertBulkSize(Array.isArray(dto?.ids) ? dto.ids.length : (dto?.ids === undefined ? 0 : 1), options);
             return this.service.deleteMany(dto, softDelete, ...others);
         };
     }
@@ -319,6 +322,7 @@ export class CrudRoutesFactory {
     protected deleteFromTrashManyHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function deleteFromTrashMany(dto: any) {
             checkService(this);
+            assertBulkSize(Array.isArray(dto?.ids) ? dto.ids.length : (dto?.ids === undefined ? 0 : 1), R.getCrudOptions(this.constructor));
             return this.service.deleteFromTrashMany(dto);
         };
     }
@@ -345,6 +349,7 @@ export class CrudRoutesFactory {
     protected restoreManyHandler(name: CrudActionsEnum) {
         this.targetProto[name] = function restoreMany(dto: any) {
             checkService(this);
+            assertBulkSize(Array.isArray(dto?.ids) ? dto.ids.length : (dto?.ids === undefined ? 0 : 1), R.getCrudOptions(this.constructor));
             return this.service.restoreMany(dto);
         };
     }
@@ -363,6 +368,7 @@ export class CrudRoutesFactory {
             // Body is `{ ids: [...] }` (the validated DTO) or a raw id array (when
             // validation is disabled). Pass the array through to the service.
             const ids = Array.isArray(dto) ? dto : dto?.ids;
+            assertBulkSize(ids?.length ?? 0, R.getCrudOptions(this.constructor));
             return this.service.reorder(ids);
         };
     }

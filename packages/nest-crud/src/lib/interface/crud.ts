@@ -52,6 +52,13 @@ export interface CrudOptions {
      */
     maxPerPage?: number;
     maxPageSize?: number;
+    /**
+     * Maximum number of items one bulk request may carry (`createMany`, `updateMany`,
+     * `deleteMany`, `deleteFromTrashMany`, `restoreMany`, `reorder`). A larger request
+     * is rejected with `400`. Unlimited when omitted; can also be set globally via
+     * `NestCrudModule.forRoot({ maxBulkSize })`.
+     */
+    maxBulkSize?: number;
     query?: CrudQueryOptions;
     entity: any;
     routes?: Partial<CrudRoutesOptions>;

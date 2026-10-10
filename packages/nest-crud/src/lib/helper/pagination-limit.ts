@@ -96,3 +96,16 @@ export function applyNoPaginationLimit(parsed: IFindManyOptions, crudOptions?: P
     // Explicitly disable pagination windowing
     delete parsed.skip;
 }
+/**
+ * Rejects a bulk request carrying more items than `maxBulkSize` (per-controller
+ * `@Crud({ maxBulkSize })`, else the global config). No limit when neither is set.
+ */
+export function assertBulkSize(count: number, crudOptions?: Partial<CrudOptions>): void {
+    const max = Number(crudOptions?.maxBulkSize ?? CrudConfigService.config.maxBulkSize);
+    if (!Number.isFinite(max) || max <= 0) {
+        return;
+    }
+    if (count > max) {
+        throw new BadRequestException(`Bulk size (${count}) exceeds maxBulkSize (${max}).`);
+    }
+}

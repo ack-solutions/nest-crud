@@ -236,4 +236,24 @@ describePg('Postgres e2e (real database)', () => {
       expect(svc.countsInTx).toEqual([3]);
     });
   });
+
+  // Postgres raises an error on a non-UUID value for a uuid column; the package must
+  // treat such an id as "not found" instead of answering 500.
+  describe('ids that are not UUIDs', () => {
+    it('single-row routes answer 404, bulk routes skip them', async () => {
+      const { alice } = await seed();
+      await http().get('/users/abc').expect(404);
+      await http().put('/users/abc').send({ firstName: 'X' }).expect(404);
+      await http().delete('/users/abc').expect(404);
+
+      const upd = await http()
+        .put('/users/bulk')
+        .send({ bulk: [{ id: 'abc', firstName: 'X' }, { id: alice.id, firstName: 'Alicia' }] })
+        .expect(200);
+      expect(upd.body.map((u: any) => u.id)).toEqual([alice.id]);
+
+      await http().delete('/users/delete/bulk').query({ ids: ['abc', alice.id] }).expect(200);
+      await http().get(`/users/${alice.id}`).expect(404);
+    });
+  });
 });

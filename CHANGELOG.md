@@ -4,6 +4,27 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **A malformed id no longer causes a `500`.** For a UUID primary key, an id that
+  isn't UUID-shaped made Postgres raise an error: every by-id route answered `500`,
+  and one bad id in `PUT /bulk` or `DELETE /delete/bulk` failed the whole request.
+  Such an id is now treated as "not found" — `404` on `findOne` / `update` /
+  `delete` / `restore` / `deleteFromTrash`, and skipped by the bulk routes and
+  `reorder`.
+
+### Added
+
+- **`maxBulkSize`** — `@Crud({ maxBulkSize })` or `NestCrudModule.forRoot({ maxBulkSize })`
+  caps the items in one bulk request (`createMany`, `updateMany`, `deleteMany`,
+  `deleteFromTrashMany`, `restoreMany`, `reorder`); a larger request gets `400`.
+  Unlimited by default, as before.
+- AI skill: a "use the generated API first" table, the bulk rules (skips, cap,
+  malformed ids), and `ctx` on `beforeCreate` / `beforeUpdate`; the controller
+  property only has to be *named* `service` (it need not be public).
+
 ## [2.3.0] — 2026-10-10
 
 Bulk-route hook fix and an AI-assistant skill. All packages release together at this

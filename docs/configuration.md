@@ -10,6 +10,7 @@
 | `routes` | object | Per-route config — see below. |
 | `softDelete` | boolean | Enable soft-delete + the trash/restore routes. |
 | `maxPerPage` | number | Max page size for list queries (default 5000). `maxPageSize` is a legacy alias. |
+| `maxBulkSize` | number | Max items in one bulk request (create/update/delete/restore/trash many, reorder); larger requests get `400`. Unlimited by default. Also settable globally. |
 | `select` | string[] | Default columns to select when the request doesn't specify `select`. |
 | `hiddenFields` | string[] | Columns/relations to hide from the entire query surface (never selected, rejected in `where`/`order`/`aggregates`). Per-controller alternative to the [`@CrudHidden()`](./querying.md#hiding-sensitive-fields) decorator. |
 | `query.relations` | string[] | Relations always joined for this controller. |
