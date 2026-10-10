@@ -4,13 +4,21 @@ If you code with an AI assistant, give it the nest-crud **skill**: a short guide
 the package's conventions (which hook scopes what, how counts and bulk routes work,
 what not to do), so it writes code the way the package expects.
 
+There are two skills, one per side:
+
+| Project | Skill covers | Install |
+| --- | --- | --- |
+| API (NestJS) | resources, hooks, tenant scoping, bulk routes, custom routes | `npx @ackplus/nest-crud add-skill` |
+| Frontend / client (TS, JS) | building queries with `QueryBuilder`, counts, aggregates, bulk calls | `npx @ackplus/nest-crud-request add-skill` |
+
 ## Install the skill
 
-The skill ships inside the package, so it always matches your installed version.
-Run this in your project:
+Each skill ships inside its package, so it always matches your installed version.
+Run the command for your project (both take the same options):
 
 ```bash
-npx @ackplus/nest-crud add-skill
+npx @ackplus/nest-crud add-skill            # API project
+npx @ackplus/nest-crud-request add-skill    # frontend project
 ```
 
 By default it writes a Claude Code skill and adds a section to `AGENTS.md`. Pick
@@ -18,9 +26,9 @@ other tools with `--tool`:
 
 | `--tool` | Writes |
 | --- | --- |
-| `claude` | `.claude/skills/nest-crud/SKILL.md` |
+| `claude` | `.claude/skills/<package>/SKILL.md` |
 | `agents` | a marked section in `AGENTS.md` |
-| `cursor` | `.cursor/rules/nest-crud.mdc` |
+| `cursor` | `.cursor/rules/<package>.mdc` |
 | `copilot` | a marked section in `.github/copilot-instructions.md` |
 | `all` | all of the above |
 
@@ -36,7 +44,8 @@ Run it again after upgrading the package. Nothing is written at `npm install` ti
 
 Point your assistant at one of these links:
 
-- Skill: <https://ack-solutions.github.io/nest-crud/skill.md>
+- Server skill: <https://ack-solutions.github.io/nest-crud/skill.md>
+- Client skill: <https://ack-solutions.github.io/nest-crud/skill-request.md>
 - Index of all docs: <https://ack-solutions.github.io/nest-crud/llms.txt>
 
 For example: "Read https://ack-solutions.github.io/nest-crud/skill.md and follow it

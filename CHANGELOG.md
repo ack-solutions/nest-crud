@@ -4,6 +4,24 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.5.0] — 2026-10-10
+
+A second AI-assistant skill, for client projects. All packages release together at
+this version.
+
+### Added
+
+- **AI skill for `@ackplus/nest-crud-request`.** A scenario-based guide for frontend
+  / client code: building queries with `QueryBuilder`, every operator, which route
+  fits which screen, counts via `filter`, aggregates, trash views, bulk calls, long
+  queries and common mistakes. Ships inside the package; install with
+  `npx @ackplus/nest-crud-request add-skill` (same `--tool` options as the server
+  one). Also at `/skill-request.md` on the docs site.
+
+### Changed
+
+- The server skill's client section is now a short pointer to the client skill.
+
 ## [2.4.0] — 2026-10-10
 
 A malformed-id fix and an optional bulk-size cap. All packages release together at

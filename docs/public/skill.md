@@ -53,22 +53,12 @@ none of these fit:
 | Drag-and-drop ordering | `PUT /reorder` |
 | Different logic on a standard route | override the service method or hook, keep the route |
 
-## Querying (client side)
+## Querying
 
 Query params are JSON strings: `where`, `relations`, `order`, `select`, `aggregates`,
-`having`, plus `take`/`skip`, `withDeleted`, `onlyDeleted`. Build them with the
-client builder instead of by hand:
-
-```ts
-import { QueryBuilder, OrderDirectionEnum } from '@ackplus/nest-crud-request';
-
-const query = new QueryBuilder()
-  .where({ status: { $in: ['open', 'held'] } })
-  .addRelation('author')
-  .addOrder('createdAt', OrderDirectionEnum.DESC)
-  .setTake(20)
-  .toObject();                       // pass as the request's query params
-```
+`having`, plus `take`/`skip`, `withDeleted`, `onlyDeleted`. Client code should build
+them with `QueryBuilder` from `@ackplus/nest-crud-request` — that package ships its
+own skill (`npx @ackplus/nest-crud-request add-skill`).
 
 - **Counts** take the whole query inside `filter`, not as root params:
   `GET /notes/get/counts?filter={"where":{…},"onlyDeleted":true}&groupByKey=status`.
