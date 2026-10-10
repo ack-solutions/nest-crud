@@ -4,7 +4,8 @@
 
 AI assistants: read the skill first — it is the short, scenario-based guide to using this package correctly.
 
-- [Skill (start here)](https://ack-solutions.github.io/nest-crud/skill.md)
+- [Server skill — building the API with @ackplus/nest-crud](https://ack-solutions.github.io/nest-crud/skill.md)
+- [Client skill — querying it with @ackplus/nest-crud-request](https://ack-solutions.github.io/nest-crud/skill-request.md)
 
 ## Docs
 

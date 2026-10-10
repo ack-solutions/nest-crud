@@ -1,3 +1,9 @@
+## 2.5.0
+
+- Version aligned with the `@ackplus/nest-crud` 2.5.0 release (an AI-assistant skill
+  for the JS/TS client). No changes to the Dart query builder itself — all packages
+  release together at one version.
+
 ## 2.4.0
 
 - Version aligned with the `@ackplus/nest-crud` 2.4.0 release (server-side: malformed
