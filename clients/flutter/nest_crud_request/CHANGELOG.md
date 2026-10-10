@@ -1,3 +1,9 @@
+## 2.4.0
+
+- Version aligned with the `@ackplus/nest-crud` 2.4.0 release (server-side: malformed
+  ids answer 404 instead of 500, optional `maxBulkSize`). No changes to the Dart query
+  builder itself — all packages release together at one version.
+
 ## 2.3.0
 
 - Version aligned with the `@ackplus/nest-crud` 2.3.0 release (server-side: bulk-route
