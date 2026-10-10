@@ -447,7 +447,7 @@ GET /users/get/counts?filter={"onlyDeleted":true}                    # how many 
 GET /users/get/counts?filter={"onlyDeleted":true}&groupByKey=status
 ```
 
-With the client builder that's just `new RequestQueryBuilder().setOnlyDeleted(true)`
+With the client builder that's just `new QueryBuilder().setOnlyDeleted(true)`
 (plus any `where`) passed straight through as the `filter`.
 
 ## Soft delete

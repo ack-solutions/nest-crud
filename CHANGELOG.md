@@ -4,7 +4,10 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.3.0] — 2026-10-10
+
+Bulk-route hook fix and an AI-assistant skill. All packages release together at this
+version.
 
 ### Fixed
 
@@ -18,9 +21,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   After-hooks (`afterSave`, `afterCreate`, `afterUpdate`) now run **after the
   transaction commits**, as they already did for single `create` / `update`.
   Before-hooks receive the transaction's manager as `context.manager`.
+- Docs: the client builder class is `QueryBuilder` (one example called it
+  `RequestQueryBuilder`).
 
 ### Added
 
+- **AI-assistant skill.** A short, scenario-based guide to using the package
+  correctly ships inside it (`skills/nest-crud/SKILL.md`). Install it into a project
+  with `npx @ackplus/nest-crud add-skill` (`--tool claude | cursor | agents |
+  copilot | all`); nothing is written at `npm install` time. Also published at
+  `/skill.md` with an `/llms.txt` index on the docs site. See
+  [AI assistants](./docs/ai-assistants.md).
+- GitHub bug-report issue template.
 - `CrudSaveContext.manager` — the transaction's `EntityManager`, set for
   `createMany` / `updateMany`.
 - `beforeCreate(data, request?, context?)` and `beforeUpdate(data, oldData?, context?)`

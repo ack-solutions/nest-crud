@@ -31,6 +31,7 @@ export default defineConfig({
         items: [
           { text: 'Getting started', link: '/getting-started' },
           { text: 'Configuration', link: '/configuration' },
+          { text: 'AI assistants', link: '/ai-assistants' },
         ],
       },
       {

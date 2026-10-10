@@ -1,0 +1,25 @@
+# @ackplus/nest-crud
+
+> CRUD route generator for NestJS + TypeORM: `@Crud()` on a controller plus a `CrudService<T>` subclass. Client query builders: `@ackplus/nest-crud-request` (JS/TS) and `nest_crud_request` (Dart).
+
+AI assistants: read the skill first — it is the short, scenario-based guide to using this package correctly.
+
+- [Skill (start here)](https://ack-solutions.github.io/nest-crud/skill.md)
+
+## Docs
+
+- [Getting started](https://ack-solutions.github.io/nest-crud/getting-started)
+- [Configuration and routes](https://ack-solutions.github.io/nest-crud/configuration)
+- [Querying: operators, relations, aggregates, counts](https://ack-solutions.github.io/nest-crud/querying)
+- [Lifecycle hooks, tenant scoping, bulk transactions](https://ack-solutions.github.io/nest-crud/lifecycle-hooks)
+- [Custom routes and overrides](https://ack-solutions.github.io/nest-crud/custom-routes)
+- [Soft delete](https://ack-solutions.github.io/nest-crud/soft-delete)
+- [Auth and guards](https://ack-solutions.github.io/nest-crud/auth-and-guards)
+- [Large queries](https://ack-solutions.github.io/nest-crud/large-queries)
+- [Error handling](https://ack-solutions.github.io/nest-crud/error-handling)
+- [Migration and upgrade notes](https://ack-solutions.github.io/nest-crud/migration)
+
+## Project
+
+- [Changelog](https://github.com/ack-solutions/nest-crud/blob/main/CHANGELOG.md)
+- [Report a bug](https://github.com/ack-solutions/nest-crud/issues/new/choose)
