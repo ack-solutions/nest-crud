@@ -103,8 +103,18 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
                 orderPlan.push({ alias: derivedAlias, dir: order[key] });
                 continue;
             }
+            // A column of a to-one relation (many-to-one, or the owning side of a
+            // one-to-one): exactly one value per row, so select it via a one-row
+            // correlated subquery and sort on that — no join, no row fan-out.
+            const toOne = this.toOneRelationColumn(helper, key);
+            if (toOne) {
+                const derivedAlias = `ord_${key.replace(/[^A-Za-z0-9_]/g, '_')}`;
+                inner.addSelect(`(${toOne})`, derivedAlias);
+                orderPlan.push({ alias: derivedAlias, dir: order[key] });
+                continue;
+            }
             throw new BadRequestException(
-                `Cannot order an aggregate query by '${key}' — only root columns and aggregate aliases are supported`,
+                `Cannot order an aggregate query by '${key}' — only root columns, columns of a many-to-one / one-to-one relation, and aggregate aliases are supported`,
             );
         }
 
@@ -217,6 +227,31 @@ export class AggregateQueryBuilder<T extends ObjectLiteral> {
         }
 
         return { items, total };
+    }
+
+    /**
+     * For an order key `relation.column` on a to-one relation (many-to-one, or the
+     * owning side of a one-to-one), the SQL of a correlated subquery returning that
+     * column for the row; otherwise null. Hidden relations/columns are refused.
+     */
+    private toOneRelationColumn(helper: QueryBuilderHelper<T>, key: string): string | null {
+        const parts = key.split('.');
+        if (parts.length !== 2 || helper.isHiddenField(key)) {
+            return null;
+        }
+        const [relationName, column] = parts;
+        const relation = this.repository.metadata.relations.find((r) => r.propertyName === relationName);
+        if (!relation || !(relation.isManyToOne || relation.isOneToOneOwner)) {
+            return null;
+        }
+        const target = relation.inverseEntityMetadata.findColumnWithPropertyName(column);
+        if (!target || target.embeddedMetadata) {
+            return null;
+        }
+        const { table, alias, condition } = helper.correlation(relationName);
+        const quote = helper.getIdentifierQuote();
+        const q = (id: string) => `${quote}${id}${quote}`;
+        return `SELECT ${q(alias)}.${q(target.databaseName)} FROM ${q(table)} ${q(alias)} WHERE ${condition}`;
     }
 
     /**

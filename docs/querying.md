@@ -338,7 +338,9 @@ GET /users?aggregates=[{"fn":"sum","field":"posts.likes","as":"likesSum"}]&order
 - `field` must be relation-qualified (e.g. `posts.id`); `as` must be a safe
   identifier and cannot collide with an entity column.
 - Aggregates are over single-level relations; many-to-many is not yet supported.
-- In an aggregate query, `order` accepts aggregate aliases and root columns.
+- In an aggregate query, `order` accepts aggregate aliases, root columns, and a column
+  of a many-to-one / one-to-one relation (e.g. `{"category.name":"ASC"}` — one value
+  per row). A column of a one-to-many relation is refused (`400`): it has many values per row.
 - With the client builder: `.addAggregate({...})`, `.having('postCount', '$gt', 5)`,
   `.addOrder('postCount', 'DESC')`.
 

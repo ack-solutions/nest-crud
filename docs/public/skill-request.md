@@ -82,6 +82,7 @@ new QueryBuilder()
   .having('postCount', Op.GT, 0)
   .addOrder('postCount', OrderDirectionEnum.DESC);
 // each item gets `postCount`; `field` must be `relation.column`
+// sorting such a list by a many-to-one column also works: .addOrder('category.name', …)
 ```
 
 ## Trash (soft delete)

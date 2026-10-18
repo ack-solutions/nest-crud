@@ -63,6 +63,7 @@ own skill (`npx @ackplus/nest-crud-request add-skill`).
 - **Counts** take the whole query inside `filter`, not as root params:
   `GET /notes/get/counts?filter={"where":{…},"onlyDeleted":true}&groupByKey=status`.
 - **Aggregates** need a relation path: `{ fn: 'count', field: 'posts.id', as: 'postCount' }`.
+  An aggregate list can still sort by a to-one relation column (`order: {"category.name":"ASC"}`).
 - An unknown or hidden field in `where`/`order`/`relations` is a `400`, by design.
 - Query too long for a URL: `CrudMethodOverrideModule.forRoot()` (see "Large queries" in the docs).
 

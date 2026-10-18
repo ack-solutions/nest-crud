@@ -74,7 +74,8 @@ v1.2.x.
   handled as a GET. See [Large queries](./large-queries).
 
 One behaviour tightening to be aware of: in an **aggregate** query, an unknown
-`order` key now returns `400` (only aggregate aliases and root columns are
+`order` key now returns `400` (only aggregate aliases, root columns and — from 2.6 —
+columns of a many-to-one / one-to-one relation are
 sortable). Plain (non-aggregate) queries are unchanged. An explicit `select` now
 always includes the primary key so nested relations keep hydrating.
 
