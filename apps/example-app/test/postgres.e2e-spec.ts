@@ -256,4 +256,19 @@ describePg('Postgres e2e (real database)', () => {
       await http().get(`/users/${alice.id}`).expect(404);
     });
   });
+
+  describe('aggregate list sorted by a many-to-one column', () => {
+    it('GET /posts with aggregates + order by author.firstName', async () => {
+      await seed(); // Alice: 2 posts, Bob: 1 post
+      const aggregates = JSON.stringify([{ fn: 'count', field: 'comments.id', as: 'commentCount' }]);
+      const asc = await http().get('/posts').query({
+        aggregates, relations: JSON.stringify(['author']), order: JSON.stringify({ 'author.firstName': 'ASC' }),
+      }).expect(200);
+      expect(asc.body.items.map((p: any) => p.author.firstName)).toEqual(['Alice', 'Alice', 'Bob']);
+      const desc = await http().get('/posts').query({
+        aggregates, relations: JSON.stringify(['author']), order: JSON.stringify({ 'author.firstName': 'DESC' }),
+      }).expect(200);
+      expect(desc.body.items.map((p: any) => p.author.firstName)).toEqual(['Bob', 'Alice', 'Alice']);
+    });
+  });
 });

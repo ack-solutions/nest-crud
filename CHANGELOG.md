@@ -4,6 +4,18 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Aggregate lists can sort by a to-one relation column.** With `aggregates` in the
+  request, `order` only accepted aggregate aliases and the record's own columns, so
+  sorting e.g. products-with-counts by `productCategory.name` returned `400` (plain
+  lists already allowed it). A column of a many-to-one relation, or the owning side
+  of a one-to-one, is now accepted — it has one value per row, so it is selected via
+  a one-row subquery with no join or row fan-out. One-to-many columns and hidden
+  fields are still refused with `400`.
+
 ## [2.5.0] — 2026-10-10
 
 A second AI-assistant skill, for client projects. All packages release together at

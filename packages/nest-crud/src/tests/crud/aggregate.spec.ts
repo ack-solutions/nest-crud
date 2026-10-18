@@ -4,6 +4,8 @@ import { DataSource, Repository } from 'typeorm';
 import { createCrudTestApp } from '../helper/testing-module';
 import { seedTestData } from '../helper/seed-data';
 import { User } from '../helper/entities/user-test.entity';
+import { Post } from '../helper/entities/post-test.entity';
+import { Profile } from '../helper/entities/profile-test.entity';
 import { AggregateQueryBuilder } from '../../lib/helper/aggregate-query-builder';
 import { CrudService } from '../../lib/service/crud-service';
 import { OrderDirectionEnum } from '../../lib/types';
@@ -167,6 +169,62 @@ describe('Aggregates (count/sum/avg/min/max) — two-phase derived table', () =>
                 aggregates: [{ fn: 'count', field: 'posts.id', as: 'name' }], // collides with a column
             }),
         ).rejects.toThrow();
+    });
+
+    describe('ordering by a to-one relation column', () => {
+        const postAgg = () => new AggregateQueryBuilder<Post>(dataSource.getRepository(Post));
+        const commentCount = [{ fn: 'count' as const, field: 'comments.id', as: 'commentCount' }];
+
+        it('sorts by a many-to-one column (post → user.name), both directions', async () => {
+            const asc = await postAgg().getManyAndCount({
+                aggregates: commentCount,
+                relations: ['user'],
+                order: { 'user.name': OrderDirectionEnum.ASC },
+            });
+            expect(asc.total).toBe(3);
+            expect(asc.items.map((p) => p.user.name)).toEqual(['Jane Smith', 'John Doe', 'John Doe']);
+            expect(asc.items.every((p) => typeof (p as any).commentCount === 'number')).toBe(true);
+
+            const desc = await postAgg().getManyAndCount({
+                aggregates: commentCount,
+                relations: ['user'],
+                order: { 'user.name': OrderDirectionEnum.DESC },
+            });
+            expect(desc.items.map((p) => p.user.name)).toEqual(['John Doe', 'John Doe', 'Jane Smith']);
+        });
+
+        it('combines with an aggregate sort and paging', async () => {
+            const { items, total } = await postAgg().getManyAndCount({
+                aggregates: commentCount,
+                relations: ['user'],
+                order: { 'user.name': OrderDirectionEnum.DESC, commentCount: OrderDirectionEnum.DESC },
+                take: 1,
+                skip: 2,
+            });
+            expect(total).toBe(3);
+            expect(items).toHaveLength(1);
+            expect(items[0].user.name).toBe('Jane Smith');
+        });
+
+        it('sorts by the owning side of a one-to-one (profile → user.email)', async () => {
+            const { items } = await new AggregateQueryBuilder<Profile>(dataSource.getRepository(Profile)).getManyAndCount({
+                aggregates: [{ fn: 'count', field: 'addresses.id', as: 'addressCount' }],
+                relations: ['user'],
+                order: { 'user.email': OrderDirectionEnum.ASC },
+            });
+            expect(items.map((p) => p.user.email)).toEqual(['jane@example.com', 'john@example.com']);
+        });
+
+        it('still refuses a to-many relation column and an unknown relation column', async () => {
+            await expect(agg().getManyAndCount({
+                aggregates: [{ fn: 'count', field: 'posts.id', as: 'postCount' }],
+                order: { 'posts.title': OrderDirectionEnum.ASC }, // one-to-many: many values per row
+            })).rejects.toThrow(/Cannot order an aggregate query/);
+            await expect(postAgg().getManyAndCount({
+                aggregates: commentCount,
+                order: { 'user.nope': OrderDirectionEnum.ASC },
+            })).rejects.toThrow(/Cannot order an aggregate query/);
+        });
     });
 
     it('works through CrudService.findMany with HTTP-style JSON params', async () => {
