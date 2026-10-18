@@ -1,3 +1,9 @@
+## 2.5.1
+
+- Version aligned with the `@ackplus/nest-crud` 2.5.1 release (server-side: aggregate
+  lists can sort by a many-to-one column). No changes to the Dart query builder itself —
+  all packages release together at one version.
+
 ## 2.5.0
 
 - Version aligned with the `@ackplus/nest-crud` 2.5.0 release (an AI-assistant skill
