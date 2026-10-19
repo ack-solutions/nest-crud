@@ -56,6 +56,7 @@ Filter or sort on a related column with a dotted path, with that relation added:
 | Table with paging | `GET /notes` + `params` → `{ items, total }` |
 | Dropdown / export (all matches, no paging) | `GET /notes/get/all` + `params` → array |
 | Tab or badge counts | `GET /notes/get/counts` with `filter` (below) |
+| Amounts per status (summary cards) | counts with `sum` (below) |
 | One record with related data | `GET /notes/:id` + `{ relations }` |
 | Per-row totals ("posts per user") | `addAggregate` on the list call |
 
@@ -70,6 +71,9 @@ const { total, data } = await api.get('/notes/get/counts', {
   params: { filter, groupByKey: 'status' },         // data: [{ status, count }]
 });
 ```
+
+Add `sum: 'total'` (or an array) to also get amounts: each group row gains `total`,
+and the reply gets overall `sum: { total }`.
 
 `where`, `onlyDeleted` etc. sent as **root** params on the counts route are ignored
 or rejected. `take`/`skip` don't apply to counts.

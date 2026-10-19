@@ -103,7 +103,8 @@ Combine conditions with `$and` / `$or` (they take an array of sub-conditions):
 - `$contArr` / `$intersectsArr` are PostgreSQL-only.
 - `$exists` / `$notExists` apply to a **relation** name (not a column) and take a
   boolean: `{ "posts": { "$exists": true } }` keeps only rows with at least one
-  related row. `$exists: false` is equivalent to `$notExists: true`.
+  related row. `$exists: false` is equivalent to `$notExists: true`. Soft-deleted
+  related rows don't count (the same as when the relation is loaded).
 - Filter **values** are always parameterised. Unknown filter **fields** are
   rejected with `400 Bad Request` (only real columns / relation paths are allowed).
 
@@ -276,6 +277,8 @@ Each aggregate is a **correlated subquery**, so adding several aggregates — or
 joining the same relation via `relations` — never inflates the numbers. Pass
 `distinct: true` for `COUNT(DISTINCT …)`.
 
+Aggregates skip soft-deleted related rows, the same as a loaded relation.
+
 ### Filtering an aggregate — per-aggregate `where`
 
 Add a `where` to an aggregate spec to count/sum **only the related rows that
@@ -441,6 +444,19 @@ GET /users/get/counts?groupByKey=status
 ```json
 { "total": 100, "data": [ { "count": 60, "status": "active" }, { "count": 40, "status": "inactive" } ] }
 ```
+
+Add `sum` to total numeric columns over the same filter — per group, and overall:
+
+```
+GET /orders/get/counts?groupByKey=status&sum=total
+```
+```json
+{ "total": 12, "data": [ { "status": "open", "count": 4, "total": 950 }, { "status": "paid", "count": 8, "total": 3100 } ], "sum": { "total": 4050 } }
+```
+
+Repeat `sum` for several columns (`&sum=total&sum=tax`). Only visible numeric columns
+of the resource can be summed (`400` otherwise). Without `groupByKey` the reply is
+`{ total, sum }`.
 
 Soft-delete counts — put `withDeleted` / `onlyDeleted` in the `filter` too:
 

@@ -46,6 +46,7 @@ none of these fit:
 | Search / filter / sort / paginate a list | `GET /` with `where`, `order`, `take`, `skip` |
 | Dropdown or export of all matching rows | `GET /get/all` (same filters, no paging) |
 | Badge or tab counts, counts per status | `GET /get/counts?filter=…&groupByKey=status` |
+| Amounts per status (summary cards) | same, plus `&sum=total` |
 | "Number of posts per user" on each row | `aggregates` (+ `having`, order by the alias) |
 | Load related data | `relations` (no extra "with-details" endpoint) |
 | Trash view / count | `filter` or query with `onlyDeleted: true` |
@@ -62,6 +63,9 @@ own skill (`npx @ackplus/nest-crud-request add-skill`).
 
 - **Counts** take the whole query inside `filter`, not as root params:
   `GET /notes/get/counts?filter={"where":{…},"onlyDeleted":true}&groupByKey=status`.
+- **Counts can sum** numeric columns per group: `&groupByKey=status&sum=total` →
+  `[{ status, count, total }]` plus overall `sum` — no custom "totals" endpoint needed.
+- `$exists`, aggregates and relation sorts skip soft-deleted related rows.
 - **Aggregates** need a relation path: `{ fn: 'count', field: 'posts.id', as: 'postCount' }`.
   An aggregate list can still sort by a to-one relation column (`order: {"category.name":"ASC"}`).
 - An unknown or hidden field in `where`/`order`/`relations` is a `400`, by design.

@@ -4,6 +4,24 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Sums on the counts route.** `GET {resource}/get/counts?groupByKey=status&sum=total`
+  returns `[{ status, count, total }]` plus overall `sum: { total }`, using the same
+  filter — no custom endpoint for summary cards. Repeat `sum` for several columns;
+  only visible numeric columns are accepted (`400` otherwise). Without `groupByKey`
+  the reply is `{ total, sum }`.
+
+### Fixed
+
+- **`$exists` / `$notExists` and aggregates skip soft-deleted related rows.** Their
+  correlated subqueries had no `deletedAt IS NULL`, so an order whose only invoice was
+  soft-deleted still matched `{ invoices: { $exists: true } }`, and aggregate counts
+  and sums included deleted children — unlike a loaded relation, which hides them.
+  Sorting an aggregate list by a to-one relation column follows the same rule.
+
 ## [2.5.1] — 2026-10-18
 
 Small addition on the 2.x line. All packages release together at this version.

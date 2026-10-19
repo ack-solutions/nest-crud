@@ -271,4 +271,24 @@ describePg('Postgres e2e (real database)', () => {
       expect(desc.body.items.map((p: any) => p.author.firstName)).toEqual(['Bob', 'Alice', 'Alice']);
     });
   });
+
+  describe('counts with sum, and soft-deleted related rows', () => {
+    it('GET /posts/get/counts?groupByKey=status&sum=likes', async () => {
+      await seed(); // published 10 + 20, draft 5
+      const res = await http().get('/posts/get/counts').query({ groupByKey: 'status', sum: 'likes' }).expect(200);
+      const byStatus = Object.fromEntries(res.body.data.map((r: any) => [r.status, r]));
+      expect(byStatus.published).toEqual({ status: 'published', count: 2, likes: 30 });
+      expect(byStatus.draft).toEqual({ status: 'draft', count: 1, likes: 5 });
+      expect(res.body.sum).toEqual({ likes: 35 });
+      await http().get('/posts/get/counts').query({ sum: 'title' }).expect(400);
+    });
+
+    it('$exists ignores a soft-deleted related row', async () => {
+      const { bob } = await seed(); // Bob has one post
+      const bobPost = (await http().get('/posts').query({ where: JSON.stringify({ authorId: bob.id }) })).body.items[0];
+      await http().delete(`/posts/${bobPost.id}`).expect(200); // soft delete
+      const res = await http().get('/users').query({ where: JSON.stringify({ posts: { $exists: true } }) }).expect(200);
+      expect(res.body.items.map((u: any) => u.firstName)).toEqual(['Alice']);
+    });
+  });
 });
