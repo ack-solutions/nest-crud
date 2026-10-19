@@ -155,12 +155,19 @@ export interface ICountsRequest {
      */
     filter: IFindManyOptions;
     groupByKey?: string | string[];
+    /**
+     * Numeric columns to sum over the same filter. Each group row gets one key per
+     * column (`{ status, count, total }`), and the result gets overall sums in `sum`.
+     */
+    sum?: string | string[];
     [extraQueryParams: string]: any;
 }
 
 export interface ICountsResult {
     total: number;
     data?: Array<{ count: number } & Record<string, any>>;
+    /** Overall sums per requested column (when `sum` is given). */
+    sum?: Record<string, number>;
 }
 
 export interface IDeleteManyOptions {

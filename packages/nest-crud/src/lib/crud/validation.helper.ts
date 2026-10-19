@@ -285,6 +285,14 @@ export class Validation {
                 @IsOptional()
                 groupByKey?: string | string[];
 
+                @ApiPropertyOptional({
+                    type: String,
+                    description: `Numeric column(s) to sum per group (and overall, in \`sum\`), over the same filter. Repeat the parameter for several columns. ${docsLink('counts')}`,
+                })
+                @IsOptional()
+                @Transform(({ value }) => (value === undefined ? value : Array.isArray(value) ? value : [value]))
+                sum?: string | string[];
+
             }
             Object.defineProperty(CountsImpl, 'name', {
                 writable: false,

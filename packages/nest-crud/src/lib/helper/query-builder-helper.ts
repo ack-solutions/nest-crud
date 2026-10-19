@@ -338,7 +338,12 @@ export class QueryBuilderHelper<T extends ObjectLiteral> {
             })
             .join(' AND ');
 
-        return { table: relation.inverseEntityMetadata.tableName, alias, condition };
+        // Skip soft-deleted related rows, as a relation join does: an order whose only
+        // invoice was deleted has no invoice for $exists, aggregates and sorting.
+        const deleteDate = relation.inverseEntityMetadata.deleteDateColumn;
+        const live = deleteDate ? ` AND ${q(alias)}.${q(deleteDate.databaseName)} IS NULL` : '';
+
+        return { table: relation.inverseEntityMetadata.tableName, alias, condition: condition + live };
     }
 
     /**

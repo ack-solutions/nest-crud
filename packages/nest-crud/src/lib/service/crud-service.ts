@@ -4,6 +4,7 @@ import { FindOptionsWhere, In, Repository, SaveOptions, SelectQueryBuilder } fro
 import type { DeepPartial } from 'typeorm';
 
 import { BaseEntity } from '../base-entity';
+import { getHiddenFields } from '../decorator/crud-hidden.decorator';
 import { AggregateQueryBuilder } from '../helper/aggregate-query-builder';
 import { FindQueryBuilder } from '../helper/find-query-builder';
 import { stripAuditFields, stripServerManagedFields } from '../helper/new-row';
@@ -669,12 +670,22 @@ export class CrudService<T extends BaseEntity> {
         }
 
         const primaryColumn = this.repository.metadata.primaryColumns[0].propertyName;
+        const sumColumns = this.resolveSumColumns(request?.sum);
+        const escape = (name: string) => this.repository.manager.connection.driver.escape(name);
+        const addSums = () => sumColumns.forEach(({ propertyName, databaseName }) => {
+            query.addSelect(`COALESCE(SUM(${escape(query.alias)}.${escape(databaseName)}), 0)`, `sum_${propertyName}`);
+        });
 
-        // No groupByKey: return total count
+        // No groupByKey: return total count (and overall sums)
         if (!groupByKey) {
             query.select(`COUNT("${query.alias}"."${primaryColumn}")`, 'count');
-            const response = await query.getRawOne() as { count: number } | undefined;
+            addSums();
+            const response = await query.getRawOne() as Record<string, any> | undefined;
             result.total = Number(response?.count) || 0;
+            if (sumColumns.length) {
+                result.sum = Object.fromEntries(sumColumns.map(({ propertyName }) =>
+                    [propertyName, Number(response?.[`sum_${propertyName}`]) || 0]));
+            }
             return result;
         }
 
@@ -687,8 +698,14 @@ export class CrudService<T extends BaseEntity> {
             throw new BadRequestException(`Invalid groupByKey: ${invalidKeys.join(', ')}. Valid columns are: ${validColumns.join(', ')}`);
         }
 
-        // Add COUNT and groupings
+        const clash = sumColumns.find(({ propertyName }) => propertyName === 'count' || groupKeys.includes(propertyName));
+        if (clash) {
+            throw new BadRequestException(`Cannot sum '${clash.propertyName}': it is also a group key or 'count'`);
+        }
+
+        // Add COUNT, sums and groupings
         query.select(`COUNT("${query.alias}"."${primaryColumn}")`, 'count');
+        addSums();
         groupKeys.forEach(key => {
             query.addSelect(`"${query.alias}"."${key}"`, key);
             query.addGroupBy(`"${query.alias}"."${key}"`);
@@ -699,11 +716,39 @@ export class CrudService<T extends BaseEntity> {
         const total = sumBy(response, (item) => Number(item.count) || 0);
 
         result.total = total;
-        result.data = response.map(item => ({
-            ...item,
-            count: Number(item.count) || 0,
-        }));
+        result.data = response.map((item) => {
+            const row: Record<string, any> = { ...item, count: Number(item.count) || 0 };
+            for (const { propertyName } of sumColumns) {
+                row[propertyName] = Number(item[`sum_${propertyName}`]) || 0;
+                delete row[`sum_${propertyName}`];
+            }
+            return row as { count: number } & Record<string, any>;
+        });
+        if (sumColumns.length) {
+            result.sum = Object.fromEntries(sumColumns.map(({ propertyName }) =>
+                [propertyName, sumBy(result.data, (row) => row[propertyName])]));
+        }
         return result;
+    }
+
+    /**
+     * Validate the columns requested in `counts`' `sum`: real, visible, numeric
+     * columns of the root entity. Anything else is a `400`.
+     */
+    private resolveSumColumns(sum: string | string[] | undefined): Array<{ propertyName: string; databaseName: string }> {
+        if (sum === undefined || sum === null || sum === '') return [];
+        const names = uniq((Array.isArray(sum) ? sum : String(sum).split(',')).map((s) => String(s).trim()).filter(Boolean));
+        const hidden = getHiddenFields(this.repository.metadata.target);
+        const numericTypes = ['int', 'integer', 'int2', 'int4', 'int8', 'smallint', 'mediumint', 'bigint', 'tinyint',
+            'decimal', 'numeric', 'float', 'float4', 'float8', 'double', 'double precision', 'real', 'money', 'dec', 'fixed'];
+        return names.map((name) => {
+            const column = this.repository.metadata.columns.find((c) => c.propertyName === name && !c.embeddedMetadata);
+            const numeric = column && (column.type === Number || numericTypes.includes(String(column.type).toLowerCase()));
+            if (!column || hidden.has(name) || !numeric) {
+                throw new BadRequestException(`Invalid sum column: '${name}' (must be a numeric column)`);
+            }
+            return { propertyName: column.propertyName, databaseName: column.databaseName };
+        });
     }
 
     /**
