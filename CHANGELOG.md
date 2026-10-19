@@ -4,7 +4,10 @@ All notable changes to `@ackplus/nest-crud` and `@ackplus/nest-crud-request` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.5.2] — 2026-10-20
+
+Sums on the counts route and a soft-delete fix. All packages release together at
+this version.
 
 ### Added
 

@@ -1,3 +1,9 @@
+## 2.5.2
+
+- Version aligned with the `@ackplus/nest-crud` 2.5.2 release (server-side: `sum` on
+  the counts route; `$exists` and aggregates skip soft-deleted rows). No changes to the
+  Dart query builder itself — all packages release together at one version.
+
 ## 2.5.1
 
 - Version aligned with the `@ackplus/nest-crud` 2.5.1 release (server-side: aggregate
